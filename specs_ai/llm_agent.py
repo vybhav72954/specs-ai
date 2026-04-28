@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from google import genai
 
-_DEFAULT_MODEL = "gemini-2.0-flash"
+_DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Values that mean "user didn't actually configure a key" — typically left over
 # from copying .env.example without editing.
@@ -94,7 +94,7 @@ def get_recommendations(specs: dict[str, Any], model: str = _DEFAULT_MODEL) -> s
 
     Args:
         specs: Hardware specs as a plain dict (use dataclasses.asdict on HardwareSpecs).
-        model: Gemini model ID to use (default: gemini-2.0-flash).
+        model: Gemini model ID to use (default: gemini-2.5-flash).
 
     Returns:
         Recommendation text from the model.
