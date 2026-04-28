@@ -63,6 +63,9 @@ def _build_prompt(specs: dict[str, Any]) -> str:
     ram_type = ram.get("ram_type") or ""
     ram_type_part = f"{ram_type} " if ram_type and ram_type != "Unknown" else ""
 
+    sys_model = mb.get("system_model", "Unknown")
+    sys_model_part = f" [{sys_model}]" if sys_model and sys_model != "Unknown" else ""
+
     specs_block = (
         f"CPU:         {cpu.get('name', 'Unknown')} "
         f"({_format_value(cpu.get('physical_cores', '?'))}c / "
@@ -73,7 +76,7 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         f"- {_format_value(ram.get('slots_used', '?'))} slot(s) used\n"
         f"GPU:         {gpu.get('name', 'Unknown')} "
         f"({_format_value(gpu.get('vram_gb', '?'))} GB VRAM)\n"
-        f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}"
+        f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}{sys_model_part}"
     )
 
     return (
