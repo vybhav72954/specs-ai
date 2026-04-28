@@ -25,7 +25,7 @@ _SAMPLE_SPECS: dict = {
         "ram_type": "DDR4",
     },
     "gpu": {"name": "NVIDIA GeForce GTX 1650", "vram_gb": 4.0},
-    "motherboard": {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "FX505DT"},
+    "motherboard": {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "FX505DT", "system_model": "FX505DT-BI7N10"},
 }
 
 
@@ -50,6 +50,19 @@ def test_build_prompt_contains_ram_type() -> None:
 def test_build_prompt_contains_motherboard() -> None:
     """Prompt must include the motherboard model."""
     assert "FX505DT" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_system_model() -> None:
+    """Prompt must include the full OEM system model when provided."""
+    assert "FX505DT-BI7N10" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_omits_system_model_bracket_when_unknown() -> None:
+    """No bracketed system_model must appear when the value is 'Unknown'."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["motherboard"] = {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "FX505DT", "system_model": "Unknown"}
+    prompt = _build_prompt(specs)
+    assert "[Unknown]" not in prompt
 
 
 def test_build_prompt_handles_unknown_fields() -> None:

@@ -57,6 +57,7 @@ def test_motherboard_fields() -> None:
     assert isinstance(mb, MotherboardInfo)
     assert isinstance(mb.manufacturer, str)
     assert isinstance(mb.model, str)
+    assert isinstance(mb.system_model, str)
 
 
 def test_no_empty_strings() -> None:
@@ -66,6 +67,7 @@ def test_no_empty_strings() -> None:
     assert specs.gpu.name != ""
     assert specs.motherboard.manufacturer != ""
     assert specs.motherboard.model != ""
+    assert specs.motherboard.system_model != ""
     assert specs.ram.ram_type != ""
 
 
