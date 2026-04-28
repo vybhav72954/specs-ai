@@ -78,14 +78,19 @@ def _build_prompt(specs: dict[str, Any]) -> str:
 
     return (
         "You are an expert PC hardware technician.\n"
-        "The user wants to know the best upgrades for their exact machine.\n"
+        "The user wants upgrade recommendations for their exact machine.\n"
         "Be specific: name actual part models and explain the real-world benefit "
         "of each upgrade. Prioritise by impact-per-dollar. Be concise.\n\n"
-        "Current specs:\n"
+        "Known specs (this is the complete set of components retrieved from the machine):\n"
         "---\n"
         f"{specs_block}\n"
         "---\n\n"
-        "What are the best upgrade paths for this machine?"
+        "IMPORTANT: Only recommend upgrades for the components listed above "
+        "(CPU, RAM, GPU, Motherboard). "
+        "Do NOT mention, assume, or speculate about components that are not listed "
+        "(e.g. storage, PSU, cooling, peripherals). "
+        "If you have no meaningful upgrade recommendation for a listed component, skip it.\n\n"
+        "What are the best upgrade paths for the components listed above?"
     )
 
 
