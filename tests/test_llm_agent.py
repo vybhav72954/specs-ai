@@ -96,6 +96,20 @@ def test_build_prompt_is_ascii_safe() -> None:
     prompt.encode("ascii")  # raises UnicodeEncodeError if any non-ASCII present
 
 
+def test_build_prompt_restricts_to_listed_components() -> None:
+    """Prompt must instruct the LLM not to recommend unlisted components."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "Do NOT mention, assume, or speculate about components that are not listed" in prompt
+    assert "storage" in prompt  # must name at least one excluded category
+
+
+def test_build_prompt_scopes_closing_question() -> None:
+    """Closing question must be scoped to listed components, not open-ended."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "components listed above" in prompt
+    assert "What are the best upgrade paths for this machine?" not in prompt
+
+
 # ---- _format_value ----------------------------------------------------------
 
 
