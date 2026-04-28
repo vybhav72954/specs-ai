@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "specs-ai"
+version = "0.1.0"
+description = "AI-powered hardware upgrade assistant"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+    "google-genai",
+    "psutil",
+    "WMI",
+]
+
+[project.scripts]
+specs-ai = "specs_ai.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["specs_ai"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

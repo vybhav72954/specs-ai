@@ -1,0 +1,28 @@
+# venv
+.venv/
+
+# editor
+.vscode
+
+# secrets
+.env
+
+# claude project instructions (local only)
+CLAUDE.md
+.claude
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# build / dist
+dist/
+build/
+*.egg-info/
+
+# test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
