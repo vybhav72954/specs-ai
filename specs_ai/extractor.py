@@ -17,6 +17,31 @@ _MEMORY_TYPE_MAP: dict[int, str] = {
     34: "DDR5",
 }
 
+_VIRTUAL_GPU_NAMES: tuple[str, ...] = (
+    "microsoft basic display",
+    "microsoft remote display",
+    "citrix indirect display",
+    "vmware",
+    "virtualbox",
+    "hyper-v",
+    "parsec",
+    "displaylink",
+)
+
+_GENERIC_BOARD_STRINGS: frozenset[str] = frozenset(
+    {
+        "to be filled by o.e.m.",
+        "default string",
+        "system manufacturer",
+        "system product name",
+        "not specified",
+        "not available",
+        "none",
+        "n/a",
+        "",
+    }
+)
+
 
 @dataclass
 class CPUInfo:
@@ -25,7 +50,7 @@ class CPUInfo:
     name: str
     physical_cores: int | str
     logical_cores: int | str
-    max_clock_mhz: float | str
+    max_clock_mhz: int | str
 
 
 @dataclass
@@ -64,14 +89,51 @@ class HardwareSpecs:
     motherboard: MotherboardInfo
 
 
+def _clean_board_string(value: str | None) -> str:
+    """Return a cleaned BIOS string, or 'Unknown' for known placeholder values."""
+    if value is None:
+        return "Unknown"
+    cleaned = value.strip()
+    if cleaned.lower() in _GENERIC_BOARD_STRINGS:
+        return "Unknown"
+    return cleaned
+
+
+def _is_real_gpu(name: str | None) -> bool:
+    """Return False for virtual or fallback display adapters."""
+    if not name:
+        return False
+    lower = name.lower()
+    return not any(virt in lower for virt in _VIRTUAL_GPU_NAMES)
+
+
+def _adapter_ram_to_bytes(adapter_ram: object) -> int:
+    """Coerce WMI Win32_VideoController.AdapterRAM to unsigned bytes.
+
+    pywin32 surfaces the underlying uint32 as a signed Python int, so values
+    >= 2 GB appear negative. Re-add 2**32 to recover the unsigned value.
+    Note: actual VRAM >= 4 GB still cannot be represented (overflows to ~0);
+    use _vram_from_registry for those cases.
+    """
+    if adapter_ram is None:
+        return 0
+    try:
+        val = int(adapter_ram)
+    except (TypeError, ValueError):
+        return 0
+    if val < 0:
+        val += 2**32
+    return max(val, 0)
+
+
 def _get_cpu() -> CPUInfo:
     """Extract CPU name, core counts, and max clock speed via WMI and psutil."""
     name: str = "Unknown"
-    max_clock: float | str = "Unknown"
+    max_clock: int | str = "Unknown"
     try:
         proc = wmi.WMI().Win32_Processor()[0]
         name = proc.Name.strip() if proc.Name else "Unknown"
-        max_clock = float(proc.MaxClockSpeed) if proc.MaxClockSpeed else "Unknown"
+        max_clock = int(proc.MaxClockSpeed) if proc.MaxClockSpeed else "Unknown"
     except Exception:
         pass
 
@@ -92,25 +154,41 @@ def _get_cpu() -> CPUInfo:
 
 
 def _get_ram() -> RAMInfo:
-    """Extract total RAM, slot count, speed, and memory type via WMI and psutil."""
-    total_gb: float | str = "Unknown"
-    try:
-        total_gb = round(psutil.virtual_memory().total / (1024**3), 1)
-    except Exception:
-        pass
+    """Extract installed RAM, slot count, speed, and memory type via WMI.
 
+    Total capacity is summed from Win32_PhysicalMemory (installed amount),
+    not psutil.virtual_memory().total which reports only OS-usable memory
+    after BIOS/iGPU reservations.
+    """
+    total_gb: float | str = "Unknown"
     slots_used: int | str = "Unknown"
     speed_mhz: int | str = "Unknown"
     ram_type: str = "Unknown"
+
     try:
         sticks = wmi.WMI().Win32_PhysicalMemory()
         slots_used = len(sticks)
+
+        capacities = [int(s.Capacity) for s in sticks if s.Capacity]
+        if capacities:
+            total_gb = round(sum(capacities) / (1024**3), 1)
+
+        # System runs at the speed of the slowest installed stick.
         speeds = [int(s.Speed) for s in sticks if s.Speed]
-        speed_mhz = speeds[0] if speeds else "Unknown"
+        if speeds:
+            speed_mhz = min(speeds)
+
         types = [int(s.SMBIOSMemoryType) for s in sticks if s.SMBIOSMemoryType]
-        ram_type = _MEMORY_TYPE_MAP.get(types[0], "Unknown") if types else "Unknown"
+        if types:
+            ram_type = _MEMORY_TYPE_MAP.get(types[0], "Unknown")
     except Exception:
         pass
+
+    if total_gb == "Unknown":
+        try:
+            total_gb = round(psutil.virtual_memory().total / (1024**3), 1)
+        except Exception:
+            pass
 
     return RAMInfo(
         total_gb=total_gb,
@@ -126,7 +204,7 @@ _GPU_REG_KEY = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1
 def _vram_from_registry(gpu_name: str) -> float | str:
     """Read VRAM from the Windows registry as a fallback for WMI AdapterRAM overflow.
 
-    WMI reports AdapterRAM as a 32-bit DWORD, so values >= 4 GB overflow to 0.
+    WMI reports AdapterRAM as a 32-bit DWORD, so values >= 4 GB overflow.
     The registry stores the same value as a 64-bit QWORD under the GPU driver
     subkey, avoiding the overflow entirely.
     """
@@ -172,21 +250,37 @@ def _vram_from_registry(gpu_name: str) -> float | str:
 
 
 def _get_gpu() -> GPUInfo:
-    """Extract GPU name and VRAM via WMI, with registry fallback for VRAM overflow."""
+    """Extract GPU name and VRAM via WMI, preferring registry for accurate VRAM.
+
+    Filters out virtual display adapters (Microsoft Basic, RDP, Citrix, VM
+    adapters). Among real GPUs, picks the one with the highest VRAM — which
+    is reliably the discrete GPU on hybrid laptops. WMI AdapterRAM is unreliable
+    (32-bit DWORD overflow), so registry is the primary source; AdapterRAM is
+    only a last-resort fallback.
+    """
     name: str = "Unknown"
     vram_gb: float | str = "Unknown"
     try:
-        controllers = wmi.WMI().Win32_VideoController()
-        # Prefer discrete GPU: pick controller with most reported VRAM first,
-        # then fall back to first entry if all report 0 (overflow case).
-        controllers.sort(key=lambda g: int(g.AdapterRAM or 0), reverse=True)
-        gpu = controllers[0]
-        name = gpu.Name.strip() if gpu.Name else "Unknown"
-        ram_bytes = int(gpu.AdapterRAM or 0)
-        if ram_bytes > 0:
-            vram_gb = round(ram_bytes / (1024**3), 1)
-        else:
-            vram_gb = _vram_from_registry(name)
+        all_controllers = wmi.WMI().Win32_VideoController()
+        controllers = [g for g in all_controllers if _is_real_gpu(g.Name)]
+        if not controllers:
+            return GPUInfo(name=name, vram_gb=vram_gb)
+
+        scored: list[tuple[float, str]] = []
+        for g in controllers:
+            g_name = g.Name.strip() if g.Name else "Unknown"
+            reg_vram = _vram_from_registry(g_name)
+            if isinstance(reg_vram, float):
+                vram = reg_vram
+            else:
+                raw_bytes = _adapter_ram_to_bytes(g.AdapterRAM)
+                vram = round(raw_bytes / (1024**3), 1) if raw_bytes > 0 else 0.0
+            scored.append((vram, g_name))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        best_vram, best_name = scored[0]
+        name = best_name
+        vram_gb = best_vram if best_vram > 0 else "Unknown"
     except Exception:
         pass
 
@@ -194,13 +288,17 @@ def _get_gpu() -> GPUInfo:
 
 
 def _get_motherboard() -> MotherboardInfo:
-    """Extract motherboard manufacturer and product name via WMI Win32_BaseBoard."""
+    """Extract motherboard manufacturer and product name via WMI Win32_BaseBoard.
+
+    Filters out generic BIOS placeholder strings ("To Be Filled By O.E.M.",
+    "Default string", etc.) — these mean the OEM never populated the field.
+    """
     manufacturer: str = "Unknown"
     model: str = "Unknown"
     try:
         board = wmi.WMI().Win32_BaseBoard()[0]
-        manufacturer = board.Manufacturer.strip() if board.Manufacturer else "Unknown"
-        model = board.Product.strip() if board.Product else "Unknown"
+        manufacturer = _clean_board_string(board.Manufacturer)
+        model = _clean_board_string(board.Product)
     except Exception:
         pass
 
