@@ -73,10 +73,11 @@ class GPUInfo:
 
 @dataclass
 class MotherboardInfo:
-    """Motherboard manufacturer and product model."""
+    """Motherboard manufacturer, product model, and full OEM system product name."""
 
     manufacturer: str
     model: str
+    system_model: str  # Win32_ComputerSystemProduct.Name — may carry variant suffix
 
 
 @dataclass
@@ -288,13 +289,18 @@ def _get_gpu() -> GPUInfo:
 
 
 def _get_motherboard() -> MotherboardInfo:
-    """Extract motherboard manufacturer and product name via WMI Win32_BaseBoard.
+    """Extract motherboard and full system product name via WMI.
 
-    Filters out generic BIOS placeholder strings ("To Be Filled By O.E.M.",
-    "Default string", etc.) — these mean the OEM never populated the field.
+    Win32_BaseBoard gives board-level manufacturer/model (e.g. "FX505DT").
+    Win32_ComputerSystemProduct.Name often carries the full OEM variant string
+    (e.g. "FX505DT-BI7N10") that BaseBoard.Product truncates. Falls back to
+    Win32_ComputerSystem.Model if ComputerSystemProduct returns nothing useful.
+    All strings are filtered through _clean_board_string to discard placeholders.
     """
     manufacturer: str = "Unknown"
     model: str = "Unknown"
+    system_model: str = "Unknown"
+
     try:
         board = wmi.WMI().Win32_BaseBoard()[0]
         manufacturer = _clean_board_string(board.Manufacturer)
@@ -302,7 +308,20 @@ def _get_motherboard() -> MotherboardInfo:
     except Exception:
         pass
 
-    return MotherboardInfo(manufacturer=manufacturer, model=model)
+    try:
+        csp = wmi.WMI().Win32_ComputerSystemProduct()[0]
+        system_model = _clean_board_string(csp.Name)
+    except Exception:
+        pass
+
+    if system_model == "Unknown":
+        try:
+            cs = wmi.WMI().Win32_ComputerSystem()[0]
+            system_model = _clean_board_string(cs.Model)
+        except Exception:
+            pass
+
+    return MotherboardInfo(manufacturer=manufacturer, model=model, system_model=system_model)
 
 
 def collect() -> HardwareSpecs:

@@ -37,7 +37,8 @@ def _print_specs(specs: HardwareSpecs) -> None:
     print(f"RAM:         {_fmt(ram.total_gb)} GB {ram_type}"
           f"@ {_fmt(ram.speed_mhz)} MHz  ({_fmt(ram.slots_used)} slot(s))")
     print(f"GPU:         {gpu.name}  ({_fmt(gpu.vram_gb)} GB VRAM)")
-    print(f"Motherboard: {mb.manufacturer} {mb.model}")
+    sys_model = f"  [{mb.system_model}]" if mb.system_model and mb.system_model != "Unknown" else ""
+    print(f"Motherboard: {mb.manufacturer} {mb.model}{sys_model}")
     print("-" * 44)
 
 
