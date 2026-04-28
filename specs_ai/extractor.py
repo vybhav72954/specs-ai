@@ -233,6 +233,9 @@ def _vram_from_registry(gpu_name: str) -> float | str:
                             )
                             if reg_type == winreg.REG_DWORD:
                                 mem_bytes: int = raw
+                            elif reg_type == winreg.REG_QWORD:
+                                # winreg returns REG_QWORD as a plain Python int
+                                mem_bytes = raw
                             elif reg_type == winreg.REG_BINARY and len(raw) == 4:
                                 mem_bytes = struct.unpack("<I", raw)[0]
                             elif reg_type == winreg.REG_BINARY and len(raw) == 8:
