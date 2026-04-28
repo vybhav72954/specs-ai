@@ -12,6 +12,7 @@ license = { file = "LICENSE" }
 dependencies = [
     "google-genai",
     "psutil",
+    "python-dotenv",
     "WMI",
 ]
 
