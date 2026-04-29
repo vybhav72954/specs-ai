@@ -61,6 +61,8 @@ def _print_specs(specs: HardwareSpecs) -> None:
         else:
             cap_str = ""
         print(f"Battery:     {p.battery_name}  (Health: {health_str}{cap_str})")
+    else:
+        print("Note:        Desktop - PSU and battery info not available via WMI.")
     print("-" * 44)
 
 

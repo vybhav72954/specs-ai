@@ -108,7 +108,7 @@ def _build_prompt(specs: dict[str, Any]) -> str:
             "carefully vetted third-party supplier.\n\n"
         )
     else:
-        battery_line = ""
+        battery_line = "\nNote:        Desktop - PSU and battery info not available via WMI."
         listed_components = "(CPU, RAM, GPU, Motherboard, Storage, WiFi)"
         battery_note = "\n"
 

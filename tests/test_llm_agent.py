@@ -205,8 +205,8 @@ def test_build_prompt_battery_replacement_callout() -> None:
     assert "original parts" in prompt
 
 
-def test_build_prompt_desktop_omits_battery_entirely() -> None:
-    """Battery must be absent from prompt and listed components when is_laptop is False."""
+def test_build_prompt_desktop_shows_psu_callout() -> None:
+    """Desktop prompt must note that PSU/battery are unavailable, with no Battery section."""
     specs = dict(_SAMPLE_SPECS)
     specs["power"] = {
         "battery_name": "Unknown",
@@ -216,6 +216,8 @@ def test_build_prompt_desktop_omits_battery_entirely() -> None:
         "is_laptop": False,
     }
     prompt = _build_prompt(specs)
+    assert "Desktop" in prompt
+    assert "PSU" in prompt
     assert "Battery" not in prompt
     assert "original parts" not in prompt  # OEM callout must also be absent
 

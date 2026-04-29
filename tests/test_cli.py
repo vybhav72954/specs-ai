@@ -340,7 +340,10 @@ def test_print_specs_shows_battery_health(capsys: pytest.CaptureFixture, sample_
     assert "48000 mWh" in out
 
 
-def test_print_specs_desktop_omits_battery(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
-    """Desktop (is_laptop=False) must not print a Battery line at all."""
+def test_print_specs_desktop_shows_psu_callout(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
+    """Desktop (is_laptop=False) must show a note that PSU and battery are not available."""
     _print_specs(unknown_specs)
-    assert "Battery" not in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Desktop" in out
+    assert "PSU" in out
+    assert "Battery" not in out
