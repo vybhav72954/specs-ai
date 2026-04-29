@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from google import genai
 
-_DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Values that mean "user didn't actually configure a key" — typically left over
 # from copying .env.example without editing.
@@ -85,8 +85,8 @@ def _build_prompt(specs: dict[str, Any]) -> str:
     wifi_name = wifi.get("name", "Unknown")
 
     power = specs.get("power") or {}
-    is_laptop = bool(power.get("is_laptop", False))
-    if is_laptop:
+    has_battery = bool(power.get("has_battery", False))
+    if has_battery:
         bat_name = power.get("battery_name", "Unknown") or "Unknown"
         health_raw = power.get("health_pct", "Unknown")
         health_str = f"{_format_value(health_raw)}%" if health_raw != "Unknown" else "Unknown"
@@ -147,7 +147,7 @@ def _build_prompt(specs: dict[str, Any]) -> str:
     )
 
 
-def get_recommendations(specs: dict[str, Any], model: str = _DEFAULT_MODEL) -> str:
+def get_recommendations(specs: dict[str, Any], model: str = DEFAULT_MODEL) -> str:
     """Build a prompt from specs and return Gemini's upgrade recommendations.
 
     Args:

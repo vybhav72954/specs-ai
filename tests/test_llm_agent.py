@@ -35,7 +35,7 @@ _SAMPLE_SPECS: dict = {
         "design_capacity_mwh": 48000,
         "full_charge_capacity_mwh": 37440,
         "health_pct": 78,
-        "is_laptop": True,
+        "has_battery": True,
     },
 }
 
@@ -213,7 +213,7 @@ def test_build_prompt_laptop_partial_battery_data() -> None:
         "design_capacity_mwh": "Unknown",
         "full_charge_capacity_mwh": "Unknown",
         "health_pct": "Unknown",
-        "is_laptop": True,
+        "has_battery": True,
     }
     prompt = _build_prompt(specs)
     assert "ASUS Battery" in prompt
@@ -230,7 +230,7 @@ def test_build_prompt_desktop_shows_psu_callout() -> None:
         "design_capacity_mwh": "Unknown",
         "full_charge_capacity_mwh": "Unknown",
         "health_pct": "Unknown",
-        "is_laptop": False,
+        "has_battery": False,
     }
     prompt = _build_prompt(specs)
     assert "Desktop" in prompt

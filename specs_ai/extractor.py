@@ -123,13 +123,14 @@ class WiFiInfo:
 
 @dataclass
 class PowerInfo:
-    """Battery health snapshot for laptops; all fields 'Unknown' on desktops."""
+    """Battery health snapshot. has_battery=False means no battery was detected
+    (typically a desktop, but also a laptop with the battery removed or a UPS-less rig)."""
 
     battery_name: str        # Win32_Battery.Name or "Unknown"
     design_capacity_mwh: int | str   # original capacity in mWh; "Unknown" if unavailable
     full_charge_capacity_mwh: int | str  # current max charge in mWh; "Unknown" if unavailable
     health_pct: int | str    # (full_charge / design) * 100, rounded; "Unknown" if unavailable
-    is_laptop: bool          # True when a battery was detected
+    has_battery: bool        # True when Win32_Battery returned at least one battery
 
 
 @dataclass
@@ -480,13 +481,14 @@ def _get_wifi() -> WiFiInfo:
 
 
 def _get_power() -> PowerInfo:
-    """Extract battery health via WMI; returns is_laptop=False on desktops.
+    """Extract battery health via WMI; returns has_battery=False when no battery is detected.
 
     Primary source: root/WMI BatteryStaticData (design capacity) and
     BatteryFullChargedCapacity (current max capacity), both in mWh.
-    Battery presence is detected via Win32_Battery; no entry means desktop.
+    Battery presence is detected via Win32_Battery; no entry means no battery
+    (typically a desktop).
     """
-    is_laptop = False
+    has_battery = False
     battery_name: str = "Unknown"
     design_mwh: int | str = "Unknown"
     full_mwh: int | str = "Unknown"
@@ -495,12 +497,12 @@ def _get_power() -> PowerInfo:
     try:
         batteries = wmi.WMI().Win32_Battery()
         if batteries:
-            is_laptop = True
+            has_battery = True
             battery_name = _clean_board_string(batteries[0].Name)
     except Exception:
         pass
 
-    if is_laptop:
+    if has_battery:
         try:
             root_wmi = wmi.WMI(namespace="root/WMI")
             static = root_wmi.BatteryStaticData()
@@ -519,7 +521,7 @@ def _get_power() -> PowerInfo:
         design_capacity_mwh=design_mwh,
         full_charge_capacity_mwh=full_mwh,
         health_pct=health_pct,
-        is_laptop=is_laptop,
+        has_battery=has_battery,
     )
 
 

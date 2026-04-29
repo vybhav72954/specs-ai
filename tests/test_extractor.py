@@ -171,12 +171,12 @@ def test_power_fields() -> None:
     power = collect().power
     assert isinstance(power, PowerInfo)
     assert isinstance(power.battery_name, str)
-    assert isinstance(power.is_laptop, bool)
+    assert isinstance(power.has_battery, bool)
     assert isinstance(power.design_capacity_mwh, (int, str))
     assert isinstance(power.full_charge_capacity_mwh, (int, str))
     assert isinstance(power.health_pct, (int, str))
     assert power.battery_name != ""
-    if power.is_laptop and isinstance(power.health_pct, int):
+    if power.has_battery and isinstance(power.health_pct, int):
         assert 0 <= power.health_pct <= 200  # sanity bound; >100 possible on new batteries
 
 
