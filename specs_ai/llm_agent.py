@@ -59,6 +59,7 @@ def _build_prompt(specs: dict[str, Any]) -> str:
     ram = specs.get("ram") or {}
     gpu = specs.get("gpu") or {}
     mb = specs.get("motherboard") or {}
+    wifi = specs.get("wifi") or {}
 
     ram_type = ram.get("ram_type") or ""
     ram_type_part = f"{ram_type} " if ram_type and ram_type != "Unknown" else ""
@@ -81,6 +82,8 @@ def _build_prompt(specs: dict[str, Any]) -> str:
     else:
         storage_line = "Storage:     Unknown"
 
+    wifi_name = wifi.get("name", "Unknown")
+
     specs_block = (
         f"CPU:         {cpu.get('name', 'Unknown')} "
         f"({_format_value(cpu.get('physical_cores', '?'))}c / "
@@ -92,7 +95,8 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         f"GPU:         {gpu.get('name', 'Unknown')} "
         f"({_format_value(gpu.get('vram_gb', '?'))} GB VRAM)\n"
         f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}{sys_model_part}\n"
-        f"{storage_line}"
+        f"{storage_line}\n"
+        f"WiFi:        {wifi_name}"
     )
 
     return (
@@ -105,7 +109,7 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         f"{specs_block}\n"
         "---\n\n"
         "IMPORTANT: Only recommend upgrades for the components listed above "
-        "(CPU, RAM, GPU, Motherboard, Storage). "
+        "(CPU, RAM, GPU, Motherboard, Storage, WiFi). "
         "Do NOT mention, assume, or speculate about components that are not listed "
         "(e.g. PSU, cooling, peripherals). "
         "If you have no meaningful upgrade recommendation for a listed component, skip it.\n\n"

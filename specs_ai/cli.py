@@ -49,6 +49,7 @@ def _print_specs(specs: HardwareSpecs) -> None:
                 print(f"             {d.name}  ({_fmt(d.size_gb)} GB, {d.drive_type})")
     else:
         print("Storage:     Unknown")
+    print(f"WiFi:        {specs.wifi.name}")
     print("-" * 44)
 
 

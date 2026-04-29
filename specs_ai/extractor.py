@@ -56,6 +56,17 @@ _MEDIA_TYPE_NAMES: dict[int, str] = {
 # Bus types that indicate removable media — excluded from storage reporting.
 _REMOVABLE_BUS_TYPES: frozenset[int] = frozenset({7, 12, 13})  # USB, SD, MMC
 
+# Substrings that identify an adapter as WiFi (checked against lowercased name/type).
+_WIFI_KEYWORDS: tuple[str, ...] = ("wi-fi", "wifi", "wireless", "wlan", "802.11")
+
+# Virtual/software WiFi adapters to exclude (checked against lowercased name).
+_VIRTUAL_WIFI_KEYWORDS: tuple[str, ...] = (
+    "microsoft wi-fi direct",
+    "microsoft hosted network",
+    "virtual",
+    "bluetooth",  # BT adapters sometimes surface alongside the combo card
+)
+
 
 @dataclass
 class CPUInfo:
@@ -104,6 +115,13 @@ class StorageInfo:
 
 
 @dataclass
+class WiFiInfo:
+    """Primary WiFi network adapter name."""
+
+    name: str  # e.g. "Intel(R) Wi-Fi 6 AX200 160MHz" or "Unknown"
+
+
+@dataclass
 class HardwareSpecs:
     """Complete hardware snapshot of the local machine."""
 
@@ -112,6 +130,7 @@ class HardwareSpecs:
     gpu: GPUInfo
     motherboard: MotherboardInfo
     drives: list[StorageInfo]
+    wifi: WiFiInfo
 
 
 def _clean_board_string(value: str | None) -> str:
@@ -417,6 +436,37 @@ def _get_drives() -> list[StorageInfo]:
     return drives
 
 
+def _is_real_wifi(name: str | None, adapter_type: str | None) -> bool:
+    """Return True for a physical WiFi adapter, False for virtual or Bluetooth-only entries."""
+    if not name:
+        return False
+    name_lower = name.lower()
+    if any(v in name_lower for v in _VIRTUAL_WIFI_KEYWORDS):
+        return False
+    type_lower = (adapter_type or "").lower()
+    return "802.11" in type_lower or any(kw in name_lower for kw in _WIFI_KEYWORDS)
+
+
+def _get_wifi() -> WiFiInfo:
+    """Extract the primary physical WiFi adapter name via Win32_NetworkAdapter.
+
+    Picks the first adapter where AdapterType contains '802.11' or the name
+    contains a recognised WiFi keyword. Virtual adapters (Microsoft Wi-Fi Direct,
+    hosted network, Bluetooth-only entries) are excluded.
+    """
+    name: str = "Unknown"
+    try:
+        for adapter in wmi.WMI().Win32_NetworkAdapter():
+            if not adapter.PhysicalAdapter:
+                continue
+            if _is_real_wifi(adapter.Name, adapter.AdapterType):
+                name = (adapter.Name or "").strip() or "Unknown"
+                break
+    except Exception:
+        pass
+    return WiFiInfo(name=name)
+
+
 def collect() -> HardwareSpecs:
     """Collect all hardware specs from this machine and return a HardwareSpecs instance."""
     return HardwareSpecs(
@@ -425,4 +475,5 @@ def collect() -> HardwareSpecs:
         gpu=_get_gpu(),
         motherboard=_get_motherboard(),
         drives=_get_drives(),
+        wifi=_get_wifi(),
     )
