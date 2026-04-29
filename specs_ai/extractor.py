@@ -59,12 +59,31 @@ _REMOVABLE_BUS_TYPES: frozenset[int] = frozenset({7, 12, 13})  # USB, SD, MMC
 # Substrings that identify an adapter as WiFi (checked against lowercased name/type).
 _WIFI_KEYWORDS: tuple[str, ...] = ("wi-fi", "wifi", "wireless", "wlan", "802.11")
 
+# Win32_ComputerSystem.PCSystemType → human-readable form factor.
+_PC_SYSTEM_TYPES: dict[int, str] = {
+    1: "Desktop",
+    2: "Laptop",
+    3: "Workstation",
+    8: "Laptop",  # Slate / tablet
+}
+
 # Virtual/software WiFi adapters to exclude (checked against lowercased name).
 _VIRTUAL_WIFI_KEYWORDS: tuple[str, ...] = (
     "microsoft wi-fi direct",
     "microsoft hosted network",
     "virtual",
     "bluetooth",  # BT adapters sometimes surface alongside the combo card
+)
+
+# Substrings that identify a GPU as integrated (checked against lowercased name).
+# Avoid vendor-prefixed terms like "intel uhd" — the "(R)" trademark symbol in
+# WMI names ("Intel(R) UHD Graphics 630") breaks that match.
+_INTEGRATED_GPU_KEYWORDS: tuple[str, ...] = (
+    "uhd graphics",     # Intel UHD — appears after the (R) marker
+    "hd graphics",      # Intel HD — same; also covers "Intel HD Graphics NNN"
+    "iris",             # Intel Iris / Iris Xe / Iris Plus
+    "radeon graphics",  # "AMD Radeon Graphics" — generic Ryzen/APU iGPU label
+    "adreno",           # Qualcomm Snapdragon iGPU
 )
 
 
@@ -76,6 +95,7 @@ class CPUInfo:
     physical_cores: int | str
     logical_cores: int | str
     max_clock_mhz: int | str
+    socket: str  # e.g. "BGA1440" (soldered), "LGA1200", "AM4", or "Unknown"
 
 
 @dataclass
@@ -90,10 +110,11 @@ class RAMInfo:
 
 @dataclass
 class GPUInfo:
-    """Primary GPU name and reported VRAM."""
+    """Primary GPU name, reported VRAM, and adapter type."""
 
     name: str
     vram_gb: float | str
+    gpu_type: str  # "Integrated", "Dedicated", or "Unknown"
 
 
 @dataclass
@@ -122,6 +143,17 @@ class WiFiInfo:
 
 
 @dataclass
+class SystemInfo:
+    """Operating-system and machine-type metadata relevant to upgrade planning."""
+
+    os_name: str          # e.g. "Windows 11 Home" (Caption without "Microsoft ")
+    os_version: str       # e.g. "10.0.26200"
+    os_build: str         # e.g. "26200"
+    os_install_date: str  # "YYYY-MM-DD" from Win32_OperatingSystem.InstallDate; proxy for purchase
+    system_type: str      # "Laptop", "Desktop", "Workstation", or "Unknown"
+
+
+@dataclass
 class PowerInfo:
     """Battery health snapshot. has_battery=False means no battery was detected
     (typically a desktop, but also a laptop with the battery removed or a UPS-less rig)."""
@@ -144,6 +176,7 @@ class HardwareSpecs:
     drives: list[StorageInfo]
     wifi: WiFiInfo
     power: PowerInfo
+    system: SystemInfo
 
 
 def _clean_board_string(value: str | None) -> str:
@@ -162,6 +195,14 @@ def _is_real_gpu(name: str | None) -> bool:
         return False
     lower = name.lower()
     return not any(virt in lower for virt in _VIRTUAL_GPU_NAMES)
+
+
+def _is_integrated_gpu(name: str | None) -> bool:
+    """Return True if the GPU name matches known integrated graphics patterns."""
+    if not name:
+        return False
+    lower = name.lower()
+    return any(kw in lower for kw in _INTEGRATED_GPU_KEYWORDS)
 
 
 def _adapter_ram_to_bytes(adapter_ram: object) -> int:
@@ -184,13 +225,15 @@ def _adapter_ram_to_bytes(adapter_ram: object) -> int:
 
 
 def _get_cpu() -> CPUInfo:
-    """Extract CPU name, core counts, and max clock speed via WMI and psutil."""
+    """Extract CPU name, core counts, max clock speed, and socket via WMI and psutil."""
     name: str = "Unknown"
     max_clock: int | str = "Unknown"
+    socket: str = "Unknown"
     try:
         proc = wmi.WMI().Win32_Processor()[0]
         name = proc.Name.strip() if proc.Name else "Unknown"
         max_clock = int(proc.MaxClockSpeed) if proc.MaxClockSpeed else "Unknown"
+        socket = (proc.SocketDesignation or "").strip() or "Unknown"
     except Exception:
         pass
 
@@ -207,6 +250,7 @@ def _get_cpu() -> CPUInfo:
         physical_cores=physical,
         logical_cores=logical,
         max_clock_mhz=max_clock,
+        socket=socket,
     )
 
 
@@ -310,23 +354,24 @@ def _vram_from_registry(gpu_name: str) -> float | str:
 
 
 def _get_gpu() -> GPUInfo:
-    """Extract GPU name and VRAM via WMI, preferring registry for accurate VRAM.
+    """Extract GPU name, VRAM, and type via WMI, preferring registry for accurate VRAM.
 
     Filters out virtual display adapters (Microsoft Basic, RDP, Citrix, VM
-    adapters). Among real GPUs, picks the one with the highest VRAM — which
-    is reliably the discrete GPU on hybrid laptops. WMI AdapterRAM is unreliable
-    (32-bit DWORD overflow), so registry is the primary source; AdapterRAM is
+    adapters). Dedicated GPUs are preferred over integrated ones; among
+    candidates the highest VRAM wins. WMI AdapterRAM is unreliable (32-bit
+    DWORD overflow), so registry is the primary VRAM source; AdapterRAM is
     only a last-resort fallback.
     """
     name: str = "Unknown"
     vram_gb: float | str = "Unknown"
+    gpu_type: str = "Unknown"
     try:
         all_controllers = wmi.WMI().Win32_VideoController()
         controllers = [g for g in all_controllers if _is_real_gpu(g.Name)]
         if not controllers:
-            return GPUInfo(name=name, vram_gb=vram_gb)
+            return GPUInfo(name=name, vram_gb=vram_gb, gpu_type=gpu_type)
 
-        scored: list[tuple[float, str]] = []
+        scored: list[tuple[float, str, str]] = []  # (vram, name, gpu_type)
         for g in controllers:
             g_name = g.Name.strip() if g.Name else "Unknown"
             reg_vram = _vram_from_registry(g_name)
@@ -335,16 +380,21 @@ def _get_gpu() -> GPUInfo:
             else:
                 raw_bytes = _adapter_ram_to_bytes(g.AdapterRAM)
                 vram = round(raw_bytes / (1024**3), 1) if raw_bytes > 0 else 0.0
-            scored.append((vram, g_name))
+            gtype = "Integrated" if _is_integrated_gpu(g_name) else "Dedicated"
+            scored.append((vram, g_name, gtype))
 
-        scored.sort(key=lambda x: x[0], reverse=True)
-        best_vram, best_name = scored[0]
+        # Prefer dedicated GPUs; fall back to highest-VRAM integrated if none.
+        dedicated = [(v, n, t) for v, n, t in scored if t == "Dedicated"]
+        candidates = dedicated if dedicated else scored
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        best_vram, best_name, best_type = candidates[0]
         name = best_name
         vram_gb = best_vram if best_vram > 0 else "Unknown"
+        gpu_type = best_type
     except Exception:
         pass
 
-    return GPUInfo(name=name, vram_gb=vram_gb)
+    return GPUInfo(name=name, vram_gb=vram_gb, gpu_type=gpu_type)
 
 
 def _get_motherboard() -> MotherboardInfo:
@@ -525,6 +575,58 @@ def _get_power() -> PowerInfo:
     )
 
 
+def _parse_wmi_date(wmi_date: str | None) -> str:
+    """Parse a WMI DMTF datetime string (YYYYMMDDHHMMSS.mmmmmm+UUU) to YYYY-MM-DD.
+
+    Returns 'Unknown' when the input is absent or malformed.
+    """
+    if not wmi_date or len(wmi_date) < 8:
+        return "Unknown"
+    try:
+        return f"{wmi_date[:4]}-{wmi_date[4:6]}-{wmi_date[6:8]}"
+    except Exception:
+        return "Unknown"
+
+
+def _get_system_info() -> SystemInfo:
+    """Extract OS name, version, build, install date, and PC form factor via WMI.
+
+    OS info comes from Win32_OperatingSystem; form factor from
+    Win32_ComputerSystem.PCSystemType. The install date is the best available
+    proxy for the machine's age — it resets on OS reinstalls, not on purchase.
+    """
+    os_name: str = "Unknown"
+    os_version: str = "Unknown"
+    os_build: str = "Unknown"
+    os_install_date: str = "Unknown"
+    system_type: str = "Unknown"
+
+    try:
+        os_obj = wmi.WMI().Win32_OperatingSystem()[0]
+        caption = (os_obj.Caption or "").strip()
+        os_name = caption.replace("Microsoft ", "").strip() or "Unknown"
+        os_version = (os_obj.Version or "Unknown").strip()
+        os_build = str(os_obj.BuildNumber or "Unknown").strip()
+        os_install_date = _parse_wmi_date(os_obj.InstallDate)
+    except Exception:
+        pass
+
+    try:
+        cs = wmi.WMI().Win32_ComputerSystem()[0]
+        pc_type = int(cs.PCSystemType or 0)
+        system_type = _PC_SYSTEM_TYPES.get(pc_type, "Unknown")
+    except Exception:
+        pass
+
+    return SystemInfo(
+        os_name=os_name,
+        os_version=os_version,
+        os_build=os_build,
+        os_install_date=os_install_date,
+        system_type=system_type,
+    )
+
+
 def collect() -> HardwareSpecs:
     """Collect all hardware specs from this machine and return a HardwareSpecs instance."""
     return HardwareSpecs(
@@ -535,4 +637,5 @@ def collect() -> HardwareSpecs:
         drives=_get_drives(),
         wifi=_get_wifi(),
         power=_get_power(),
+        system=_get_system_info(),
     )

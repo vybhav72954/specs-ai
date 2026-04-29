@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from specs_ai.cli import _fmt, _parse_args, _print_specs, main
-from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, PowerInfo, RAMInfo, StorageInfo, WiFiInfo
+from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, PowerInfo, RAMInfo, StorageInfo, SystemInfo, WiFiInfo
 from specs_ai.llm_agent import DEFAULT_MODEL
 
 
@@ -16,9 +16,9 @@ from specs_ai.llm_agent import DEFAULT_MODEL
 def sample_specs() -> HardwareSpecs:
     """Realistic HardwareSpecs snapshot used across multiple tests."""
     return HardwareSpecs(
-        cpu=CPUInfo(name="AMD Ryzen 5 3550H", physical_cores=4, logical_cores=8, max_clock_mhz=2100),
+        cpu=CPUInfo(name="AMD Ryzen 5 3550H", physical_cores=4, logical_cores=8, max_clock_mhz=2100, socket="FP5"),
         ram=RAMInfo(total_gb=16.0, slots_used=2, speed_mhz=2667, ram_type="DDR4"),
-        gpu=GPUInfo(name="NVIDIA GeForce GTX 1650", vram_gb=4.0),
+        gpu=GPUInfo(name="NVIDIA GeForce GTX 1650", vram_gb=4.0, gpu_type="Dedicated"),
         motherboard=MotherboardInfo(
             manufacturer="ASUSTeK COMPUTER INC.",
             model="FX505DT",
@@ -33,6 +33,13 @@ def sample_specs() -> HardwareSpecs:
             health_pct=78,
             has_battery=True,
         ),
+        system=SystemInfo(
+            os_name="Windows 11 Home",
+            os_version="10.0.26200",
+            os_build="26200",
+            os_install_date="2023-05-14",
+            system_type="Laptop",
+        ),
     )
 
 
@@ -40,9 +47,9 @@ def sample_specs() -> HardwareSpecs:
 def unknown_specs() -> HardwareSpecs:
     """HardwareSpecs where every field is at its Unknown/fallback value."""
     return HardwareSpecs(
-        cpu=CPUInfo(name="Unknown", physical_cores="Unknown", logical_cores="Unknown", max_clock_mhz="Unknown"),
+        cpu=CPUInfo(name="Unknown", physical_cores="Unknown", logical_cores="Unknown", max_clock_mhz="Unknown", socket="Unknown"),
         ram=RAMInfo(total_gb="Unknown", slots_used="Unknown", speed_mhz="Unknown", ram_type="Unknown"),
-        gpu=GPUInfo(name="Unknown", vram_gb="Unknown"),
+        gpu=GPUInfo(name="Unknown", vram_gb="Unknown", gpu_type="Unknown"),
         motherboard=MotherboardInfo(manufacturer="Unknown", model="Unknown", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
@@ -52,6 +59,13 @@ def unknown_specs() -> HardwareSpecs:
             full_charge_capacity_mwh="Unknown",
             health_pct="Unknown",
             has_battery=False,
+        ),
+        system=SystemInfo(
+            os_name="Unknown",
+            os_version="Unknown",
+            os_build="Unknown",
+            os_install_date="Unknown",
+            system_type="Unknown",
         ),
     )
 
@@ -111,6 +125,16 @@ def test_parse_args_model_override() -> None:
     assert args.model == "gemini-2.0-flash"
 
 
+def test_parse_args_explain_defaults_false() -> None:
+    """explain must default to False when --explain is not supplied."""
+    assert _parse_args([]).explain is False
+
+
+def test_parse_args_explain_flag() -> None:
+    """--explain must set explain to True."""
+    assert _parse_args(["--explain"]).explain is True
+
+
 def test_parse_args_version_exits_zero() -> None:
     """--version must exit with code 0."""
     with pytest.raises(SystemExit) as exc_info:
@@ -162,6 +186,24 @@ def test_print_specs_gpu(capsys: pytest.CaptureFixture, sample_specs: HardwareSp
     assert "4.0 GB" not in out
 
 
+def test_print_specs_shows_gpu_type(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must show the GPU type in brackets."""
+    _print_specs(sample_specs)
+    assert "[Dedicated]" in capsys.readouterr().out
+
+
+def test_print_specs_omits_unknown_gpu_type(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
+    """'Unknown' GPU type must not appear bracketed in the output."""
+    _print_specs(unknown_specs)
+    assert "[Unknown]" not in capsys.readouterr().out
+
+
+def test_print_specs_shows_cpu_socket(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must include the CPU socket designation."""
+    _print_specs(sample_specs)
+    assert "socket: FP5" in capsys.readouterr().out
+
+
 def test_print_specs_motherboard(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
     """Output must contain motherboard manufacturer and model."""
     _print_specs(sample_specs)
@@ -196,9 +238,9 @@ def test_print_specs_single_drive(capsys: pytest.CaptureFixture, sample_specs: H
 def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
     """Output must list all drives when more than one is present."""
     specs = HardwareSpecs(
-        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000),
+        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000, socket="LGA1200"),
         ram=RAMInfo(total_gb=16.0, slots_used=2, speed_mhz=3200, ram_type="DDR4"),
-        gpu=GPUInfo(name="GPU", vram_gb=4.0),
+        gpu=GPUInfo(name="GPU", vram_gb=4.0, gpu_type="Dedicated"),
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
         drives=[
             StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD"),
@@ -207,6 +249,8 @@ def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
         wifi=WiFiInfo(name="Unknown"),
         power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
                         full_charge_capacity_mwh="Unknown", health_pct="Unknown", has_battery=False),
+        system=SystemInfo(os_name="Windows 11 Home", os_version="10.0.26200", os_build="26200",
+                          os_install_date="2023-01-01", system_type="Desktop"),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -226,14 +270,16 @@ def test_print_specs_no_drives_shows_unknown(
 def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixture) -> None:
     """Unknown RAM type must not produce a double space before '@'."""
     specs = HardwareSpecs(
-        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000),
+        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000, socket="Unknown"),
         ram=RAMInfo(total_gb=8.0, slots_used=1, speed_mhz=3200, ram_type="Unknown"),
-        gpu=GPUInfo(name="GPU", vram_gb=2.0),
+        gpu=GPUInfo(name="GPU", vram_gb=2.0, gpu_type="Dedicated"),
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
         power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
                         full_charge_capacity_mwh="Unknown", health_pct="Unknown", has_battery=False),
+        system=SystemInfo(os_name="Windows 11 Home", os_version="10.0.26200", os_build="26200",
+                          os_install_date="2023-01-01", system_type="Desktop"),
     )
     _print_specs(specs)
     assert "  @" not in capsys.readouterr().out
@@ -275,6 +321,30 @@ def test_main_model_flag_forwarded(sample_specs: HardwareSpecs) -> None:
         main()
     _, kwargs = mock_recs.call_args
     assert kwargs.get("model") == "gemini-2.0-flash"
+
+
+def test_main_default_passes_verbose_false(sample_specs: HardwareSpecs) -> None:
+    """Default run must pass verbose=False to get_recommendations."""
+    with (
+        patch("sys.argv", ["specs-ai"]),
+        patch("specs_ai.cli.collect", return_value=sample_specs),
+        patch("specs_ai.cli.get_recommendations", return_value="ok") as mock_recs,
+    ):
+        main()
+    _, kwargs = mock_recs.call_args
+    assert kwargs.get("verbose") is False
+
+
+def test_main_explain_flag_passes_verbose_true(sample_specs: HardwareSpecs) -> None:
+    """--explain must pass verbose=True to get_recommendations."""
+    with (
+        patch("sys.argv", ["specs-ai", "--explain"]),
+        patch("specs_ai.cli.collect", return_value=sample_specs),
+        patch("specs_ai.cli.get_recommendations", return_value="ok") as mock_recs,
+    ):
+        main()
+    _, kwargs = mock_recs.call_args
+    assert kwargs.get("verbose") is True
 
 
 def test_main_environment_error_exits_1(
@@ -344,9 +414,9 @@ def test_print_specs_shows_battery_health(capsys: pytest.CaptureFixture, sample_
 def test_print_specs_laptop_partial_battery_data(capsys: pytest.CaptureFixture) -> None:
     """Laptop with battery present but capacity readings missing must show only Health."""
     specs = HardwareSpecs(
-        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000),
+        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000, socket="BGA1440"),
         ram=RAMInfo(total_gb=16.0, slots_used=2, speed_mhz=3200, ram_type="DDR4"),
-        gpu=GPUInfo(name="GPU", vram_gb=4.0),
+        gpu=GPUInfo(name="GPU", vram_gb=4.0, gpu_type="Dedicated"),
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
@@ -357,6 +427,8 @@ def test_print_specs_laptop_partial_battery_data(capsys: pytest.CaptureFixture) 
             health_pct="Unknown",
             has_battery=True,
         ),
+        system=SystemInfo(os_name="Windows 11 Home", os_version="10.0.26200", os_build="26200",
+                          os_install_date="2023-01-01", system_type="Laptop"),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -372,3 +444,27 @@ def test_print_specs_desktop_shows_psu_callout(capsys: pytest.CaptureFixture, un
     assert "Desktop" in out
     assert "PSU" in out
     assert "Battery" not in out
+
+
+def test_print_specs_shows_os_name(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must contain the OS name."""
+    _print_specs(sample_specs)
+    assert "Windows 11 Home" in capsys.readouterr().out
+
+
+def test_print_specs_shows_os_build(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must contain the OS build number."""
+    _print_specs(sample_specs)
+    assert "26200" in capsys.readouterr().out
+
+
+def test_print_specs_shows_os_install_date(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must contain the OS install date."""
+    _print_specs(sample_specs)
+    assert "2023-05-14" in capsys.readouterr().out
+
+
+def test_print_specs_shows_system_type(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must show the system type (Laptop / Desktop)."""
+    _print_specs(sample_specs)
+    assert "Laptop" in capsys.readouterr().out

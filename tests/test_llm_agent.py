@@ -17,6 +17,7 @@ _SAMPLE_SPECS: dict = {
         "physical_cores": 4,
         "logical_cores": 8,
         "max_clock_mhz": 2100,
+        "socket": "FP5",
     },
     "ram": {
         "total_gb": 16.0,
@@ -24,7 +25,7 @@ _SAMPLE_SPECS: dict = {
         "speed_mhz": 2667,
         "ram_type": "DDR4",
     },
-    "gpu": {"name": "NVIDIA GeForce GTX 1650", "vram_gb": 4.0},
+    "gpu": {"name": "NVIDIA GeForce GTX 1650", "vram_gb": 4.0, "gpu_type": "Dedicated"},
     "motherboard": {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "FX505DT", "system_model": "FX505DT-BI7N10"},
     "drives": [
         {"name": "Samsung SSD 970 EVO", "size_gb": 500.0, "drive_type": "NVMe SSD"},
@@ -36,6 +37,13 @@ _SAMPLE_SPECS: dict = {
         "full_charge_capacity_mwh": 37440,
         "health_pct": 78,
         "has_battery": True,
+    },
+    "system": {
+        "os_name": "Windows 11 Home",
+        "os_version": "10.0.26200",
+        "os_build": "26200",
+        "os_install_date": "2023-05-14",
+        "system_type": "Laptop",
     },
 }
 
@@ -51,6 +59,61 @@ def test_build_prompt_contains_cpu_name() -> None:
 def test_build_prompt_contains_gpu_name() -> None:
     """Prompt must include the GPU name."""
     assert "GTX 1650" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_cpu_socket() -> None:
+    """Prompt must include the CPU socket designation."""
+    assert "FP5" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_gpu_type() -> None:
+    """Prompt must include the GPU type (Integrated / Dedicated)."""
+    assert "Dedicated" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_bga_advisory() -> None:
+    """Prompt must include the BGA-socket advisory so the LLM knows soldered CPUs."""
+    assert "BGA" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_integrated_gpu_advisory() -> None:
+    """Prompt must include a note that Integrated GPUs cannot be upgraded separately."""
+    assert "Integrated" in _build_prompt(_SAMPLE_SPECS)
+
+
+# ---- short vs verbose mode ---------------------------------------------------
+
+
+def test_build_prompt_default_is_short_mode() -> None:
+    """Default prompt (verbose=False) must instruct the LLM to produce a table."""
+    assert "table" in _build_prompt(_SAMPLE_SPECS).lower()
+
+
+def test_build_prompt_short_mode_contains_explain_callout() -> None:
+    """Short prompt must tell the user to run --explain for more detail."""
+    assert "--explain" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_verbose_mode_no_table_instruction() -> None:
+    """Verbose prompt must not instruct the LLM to produce a table."""
+    assert "table" not in _build_prompt(_SAMPLE_SPECS, verbose=True).lower()
+
+
+def test_build_prompt_verbose_mode_no_explain_callout() -> None:
+    """Verbose prompt must not include the --explain callout."""
+    assert "--explain" not in _build_prompt(_SAMPLE_SPECS, verbose=True)
+
+
+def test_build_prompt_verbose_contains_impact_per_dollar() -> None:
+    """Verbose prompt must request impact-per-dollar analysis."""
+    assert "impact-per-dollar" in _build_prompt(_SAMPLE_SPECS, verbose=True)
+
+
+def test_build_prompt_verbose_contains_closing_question() -> None:
+    """Verbose prompt must end with the scoped upgrade question."""
+    assert "What are the best upgrade paths for the components listed above?" in _build_prompt(
+        _SAMPLE_SPECS, verbose=True
+    )
 
 
 def test_build_prompt_contains_ram_type() -> None:
@@ -220,6 +283,33 @@ def test_build_prompt_laptop_partial_battery_data() -> None:
     assert "Health: Unknown" in prompt
     assert "mWh" not in prompt  # capacity tail must be absent
     assert "original parts" in prompt  # OEM callout still applies on laptops
+
+
+def test_build_prompt_contains_os_name() -> None:
+    """Prompt must include the OS name."""
+    assert "Windows 11 Home" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_os_build() -> None:
+    """Prompt must include the OS build number."""
+    assert "26200" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_os_install_date() -> None:
+    """Prompt must include the OS install date."""
+    assert "2023-05-14" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_system_type() -> None:
+    """Prompt must include the system type (Laptop / Desktop)."""
+    assert "Laptop" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_handles_missing_system_key() -> None:
+    """Prompt must not raise when 'system' key is absent from specs dict."""
+    specs = {k: v for k, v in _SAMPLE_SPECS.items() if k != "system"}
+    prompt = _build_prompt(specs)
+    assert isinstance(prompt, str) and len(prompt) > 0
 
 
 def test_build_prompt_desktop_shows_psu_callout() -> None:

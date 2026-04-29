@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Vybhav Chaturvedi", email = "vaibhav.chats111@gmail.com" },
+    { name = "Vybhav Chaturvedi" },
 ]
 keywords = ["hardware", "specs", "upgrade", "ai", "gemini", "windows", "pc"]
 classifiers = [

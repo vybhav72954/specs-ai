@@ -53,13 +53,20 @@ def _format_value(value: Any, suffix: str = "") -> str:
     return f"{value}{suffix}"
 
 
-def _build_prompt(specs: dict[str, Any]) -> str:
-    """Format a HardwareSpecs-shaped dict into an upgrade-recommendation prompt."""
+def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
+    """Format a HardwareSpecs-shaped dict into an upgrade-recommendation prompt.
+
+    Args:
+        specs:   Hardware specs dict (from dataclasses.asdict on HardwareSpecs).
+        verbose: True → detailed narrative with part names and impact-per-dollar.
+                 False (default) → compact markdown summary table.
+    """
     cpu = specs.get("cpu") or {}
     ram = specs.get("ram") or {}
     gpu = specs.get("gpu") or {}
     mb = specs.get("motherboard") or {}
     wifi = specs.get("wifi") or {}
+    system = specs.get("system") or {}
 
     ram_type = ram.get("ram_type") or ""
     ram_type_part = f"{ram_type} " if ram_type and ram_type != "Unknown" else ""
@@ -112,21 +119,65 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         listed_components = "(CPU, RAM, GPU, Motherboard, Storage, WiFi)"
         battery_note = "\n"
 
+    os_name = system.get("os_name", "Unknown")
+    os_build = system.get("os_build", "Unknown")
+    os_install_date = system.get("os_install_date", "Unknown")
+    system_type = system.get("system_type", "Unknown")
+    system_line = (
+        f"OS:          {os_name} (build {os_build})\n"
+        f"System:      {system_type}  |  OS installed: {os_install_date}"
+        " (install date, not necessarily purchase date)"
+    )
+
     specs_block = (
+        f"{system_line}\n"
         f"CPU:         {cpu.get('name', 'Unknown')} "
         f"({_format_value(cpu.get('physical_cores', '?'))}c / "
         f"{_format_value(cpu.get('logical_cores', '?'))}t, "
-        f"max {_format_value(cpu.get('max_clock_mhz', '?'))} MHz)\n"
+        f"max {_format_value(cpu.get('max_clock_mhz', '?'))} MHz, "
+        f"socket: {cpu.get('socket', 'Unknown')})\n"
         f"RAM:         {_format_value(ram.get('total_gb', '?'))} GB "
         f"{ram_type_part}@ {_format_value(ram.get('speed_mhz', '?'))} MHz "
         f"- {_format_value(ram.get('slots_used', '?'))} slot(s) used\n"
         f"GPU:         {gpu.get('name', 'Unknown')} "
-        f"({_format_value(gpu.get('vram_gb', '?'))} GB VRAM)\n"
+        f"({_format_value(gpu.get('vram_gb', '?'))} GB VRAM, "
+        f"{gpu.get('gpu_type', 'Unknown')})\n"
         f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}{sys_model_part}\n"
         f"{storage_line}\n"
         f"WiFi:        {wifi_name}"
         f"{battery_line}"
     )
+
+    # Advisory note shared by both prompt modes.
+    hardware_note = (
+        "NOTE: If the CPU socket starts with 'BGA', the CPU is soldered to the board "
+        "and cannot be replaced - Status: Cannot upgrade. "
+        "If the GPU type is 'Integrated', it is part of the CPU die and cannot be upgraded "
+        "separately; on a desktop you may suggest adding a discrete GPU, but on a laptop "
+        "this is not possible.\n"
+    )
+
+    if not verbose:
+        return (
+            "You are an expert PC hardware technician.\n"
+            "The user wants a quick upgrade summary for their machine.\n"
+            "Respond with a markdown table with three columns: Component | Status | Notes\n"
+            "Status must be exactly one of: Cannot upgrade | Upgradeable | Up to date | Monitor\n"
+            "Notes: 1-2 sentences. For Cannot upgrade: state why (e.g. BGA socket, soldered RAM). "
+            "For Upgradeable: name the specific upgrade target and its main benefit.\n\n"
+            "Known specs (complete set of components retrieved from the machine):\n"
+            "---\n"
+            f"{specs_block}\n"
+            "---\n\n"
+            f"IMPORTANT: Only include in the table the components listed above "
+            f"{listed_components}. "
+            "Do NOT mention, assume, or speculate about components that are not listed "
+            "(e.g. PSU, cooling, peripherals).\n"
+            f"{hardware_note}"
+            f"{battery_note}"
+            "After the table, add exactly this line:\n"
+            "Run `specs-ai --explain` for detailed part recommendations and impact analysis."
+        )
 
     return (
         "You are an expert PC hardware technician.\n"
@@ -142,17 +193,24 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         "Do NOT mention, assume, or speculate about components that are not listed "
         "(e.g. PSU, cooling, peripherals). "
         "If you have no meaningful upgrade recommendation for a listed component, skip it.\n"
+        f"{hardware_note}"
         f"{battery_note}"
         "What are the best upgrade paths for the components listed above?"
     )
 
 
-def get_recommendations(specs: dict[str, Any], model: str = DEFAULT_MODEL) -> str:
+def get_recommendations(
+    specs: dict[str, Any],
+    model: str = DEFAULT_MODEL,
+    verbose: bool = False,
+) -> str:
     """Build a prompt from specs and return Gemini's upgrade recommendations.
 
     Args:
-        specs: Hardware specs as a plain dict (use dataclasses.asdict on HardwareSpecs).
-        model: Gemini model ID to use (default: gemini-2.5-flash).
+        specs:   Hardware specs as a plain dict (use dataclasses.asdict on HardwareSpecs).
+        model:   Gemini model ID to use (default: gemini-2.5-flash).
+        verbose: True → detailed narrative with part names and impact-per-dollar.
+                 False (default) → compact markdown summary table.
 
     Returns:
         Recommendation text from the model.
@@ -162,7 +220,7 @@ def get_recommendations(specs: dict[str, Any], model: str = DEFAULT_MODEL) -> st
         RuntimeError:     If the Gemini API call fails (network, auth, quota, etc.).
     """
     api_key = _load_api_key()
-    prompt = _build_prompt(specs)
+    prompt = _build_prompt(specs, verbose=verbose)
     try:
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(model=model, contents=prompt)

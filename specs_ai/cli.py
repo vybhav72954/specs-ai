@@ -27,14 +27,19 @@ def _print_specs(specs: HardwareSpecs) -> None:
 
     ram_type = f"{ram.ram_type} " if ram.ram_type and ram.ram_type != "Unknown" else ""
 
+    s = specs.system
     print("Hardware specs")
+    print("-" * 44)
+    print(f"OS:          {s.os_name}  (build {s.os_build})")
+    print(f"System:      {s.system_type}  |  OS installed: {s.os_install_date}")
     print("-" * 44)
     print(f"CPU:         {cpu.name}")
     print(f"             {_fmt(cpu.physical_cores)}c / {_fmt(cpu.logical_cores)}t"
-          f"  max {_fmt(cpu.max_clock_mhz)} MHz")
+          f"  max {_fmt(cpu.max_clock_mhz)} MHz  |  socket: {cpu.socket}")
     print(f"RAM:         {_fmt(ram.total_gb)} GB {ram_type}"
           f"@ {_fmt(ram.speed_mhz)} MHz  ({_fmt(ram.slots_used)} slot(s))")
-    print(f"GPU:         {gpu.name}  ({_fmt(gpu.vram_gb)} GB VRAM)")
+    gpu_type_part = f"  [{gpu.gpu_type}]" if gpu.gpu_type and gpu.gpu_type != "Unknown" else ""
+    print(f"GPU:         {gpu.name}  ({_fmt(gpu.vram_gb)} GB VRAM){gpu_type_part}")
     sys_model = f"  [{mb.system_model}]" if mb.system_model and mb.system_model != "Unknown" else ""
     print(f"Motherboard: {mb.manufacturer} {mb.model}{sys_model}")
     if specs.drives:
@@ -86,6 +91,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="MODEL",
         help=f"Gemini model ID to use (default: {DEFAULT_MODEL}).",
     )
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Show detailed upgrade recommendations with specific part suggestions (default is a summary table).",
+    )
     return parser.parse_args(argv)
 
 
@@ -105,7 +115,7 @@ def main() -> None:
     print("Querying Gemini for upgrade recommendations...", flush=True)
     print()
     try:
-        recommendations = get_recommendations(dataclasses.asdict(specs), model=args.model)
+        recommendations = get_recommendations(dataclasses.asdict(specs), model=args.model, verbose=args.explain)
     except EnvironmentError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -8,12 +8,15 @@ from specs_ai.extractor import (
     PowerInfo,
     RAMInfo,
     StorageInfo,
+    SystemInfo,
     WiFiInfo,
     _adapter_ram_to_bytes,
     _clean_board_string,
+    _is_integrated_gpu,
     _is_real_gpu,
     _is_real_wifi,
     _MEMORY_TYPE_MAP,
+    _parse_wmi_date,
     collect,
 )
 
@@ -35,6 +38,7 @@ def test_cpu_fields() -> None:
     assert isinstance(cpu.physical_cores, (int, str))
     assert isinstance(cpu.logical_cores, (int, str))
     assert isinstance(cpu.max_clock_mhz, (int, str))
+    assert isinstance(cpu.socket, str) and cpu.socket != ""
 
 
 def test_ram_fields() -> None:
@@ -53,6 +57,8 @@ def test_gpu_fields() -> None:
     assert isinstance(gpu, GPUInfo)
     assert isinstance(gpu.name, str)
     assert isinstance(gpu.vram_gb, (float, str))
+    assert gpu.gpu_type in ("Integrated", "Dedicated", "Unknown")
+    assert gpu.gpu_type != ""
 
 
 def test_motherboard_fields() -> None:
@@ -166,6 +172,17 @@ def test_wifi_fields() -> None:
     assert wifi.name != ""
 
 
+def test_system_fields() -> None:
+    """SystemInfo must always be present with non-empty string fields."""
+    system = collect().system
+    assert isinstance(system, SystemInfo)
+    assert isinstance(system.os_name, str) and system.os_name != ""
+    assert isinstance(system.os_version, str) and system.os_version != ""
+    assert isinstance(system.os_build, str) and system.os_build != ""
+    assert isinstance(system.os_install_date, str) and system.os_install_date != ""
+    assert isinstance(system.system_type, str) and system.system_type != ""
+
+
 def test_power_fields() -> None:
     """PowerInfo must always be present with correct field types."""
     power = collect().power
@@ -204,3 +221,51 @@ def test_is_real_wifi_rejects_wired_adapters() -> None:
     """Wired Ethernet adapters must not be treated as WiFi."""
     assert not _is_real_wifi("Realtek PCIe GbE Family Controller", None)
     assert not _is_real_wifi("Intel(R) Ethernet Connection I219-V", "Ethernet 802.3")
+
+
+# ---- unit: _is_integrated_gpu -----------------------------------------------
+
+
+def test_is_integrated_gpu_accepts_known_igpu() -> None:
+    """Common integrated GPU names must be recognised."""
+    assert _is_integrated_gpu("Intel(R) UHD Graphics 630")
+    assert _is_integrated_gpu("Intel(R) HD Graphics 520")
+    assert _is_integrated_gpu("Intel(R) Iris(R) Xe Graphics")
+    assert _is_integrated_gpu("AMD Radeon Graphics")
+
+
+def test_is_integrated_gpu_rejects_discrete() -> None:
+    """Discrete GPU names must not be classified as integrated."""
+    assert not _is_integrated_gpu("NVIDIA GeForce GTX 1650")
+    assert not _is_integrated_gpu("AMD Radeon RX 6800 XT")
+    assert not _is_integrated_gpu("AMD Radeon Pro 5500M")
+
+
+def test_is_integrated_gpu_rejects_empty_and_none() -> None:
+    """None and empty string must return False without raising."""
+    assert not _is_integrated_gpu(None)
+    assert not _is_integrated_gpu("")
+
+
+# ---- unit: _parse_wmi_date ---------------------------------------------------
+
+
+def test_parse_wmi_date_valid_dmtf() -> None:
+    """Full DMTF datetime string must parse to YYYY-MM-DD."""
+    assert _parse_wmi_date("20230514152345.123456+000") == "2023-05-14"
+
+
+def test_parse_wmi_date_date_only_prefix() -> None:
+    """Bare 8-digit date prefix is enough to produce a valid result."""
+    assert _parse_wmi_date("20230101") == "2023-01-01"
+
+
+def test_parse_wmi_date_none_returns_unknown() -> None:
+    """None input must return 'Unknown'."""
+    assert _parse_wmi_date(None) == "Unknown"
+
+
+def test_parse_wmi_date_short_string_returns_unknown() -> None:
+    """Strings shorter than 8 characters must return 'Unknown'."""
+    assert _parse_wmi_date("2023") == "Unknown"
+    assert _parse_wmi_date("") == "Unknown"
