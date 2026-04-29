@@ -39,6 +39,16 @@ def _print_specs(specs: HardwareSpecs) -> None:
     print(f"GPU:         {gpu.name}  ({_fmt(gpu.vram_gb)} GB VRAM)")
     sys_model = f"  [{mb.system_model}]" if mb.system_model and mb.system_model != "Unknown" else ""
     print(f"Motherboard: {mb.manufacturer} {mb.model}{sys_model}")
+    if specs.drives:
+        if len(specs.drives) == 1:
+            d = specs.drives[0]
+            print(f"Storage:     {d.name}  ({_fmt(d.size_gb)} GB, {d.drive_type})")
+        else:
+            print(f"Storage ({len(specs.drives)}):")
+            for d in specs.drives:
+                print(f"             {d.name}  ({_fmt(d.size_gb)} GB, {d.drive_type})")
+    else:
+        print("Storage:     Unknown")
     print("-" * 44)
 
 

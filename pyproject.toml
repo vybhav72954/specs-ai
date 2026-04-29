@@ -4,23 +4,49 @@ build-backend = "hatchling.build"
 
 [project]
 name = "specs-ai"
-version = "0.1.0"
-description = "AI-powered hardware upgrade assistant"
+dynamic = ["version"]
+description = "AI-powered hardware upgrade assistant for Windows"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-dependencies = [
-    "google-genai",
-    "psutil",
-    "python-dotenv",
-    "WMI",
+authors = [
+    { name = "Vybhav Chaturvedi", email = "vaibhav.chats111@gmail.com" },
 ]
+keywords = ["hardware", "specs", "upgrade", "ai", "gemini", "windows", "pc"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Hardware",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "google-genai>=1.0.0",
+    "psutil>=5.9.0",
+    "python-dotenv>=1.0.0",
+    "WMI>=1.5.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/vybhav72954/specs-ai"
+Repository = "https://github.com/vybhav72954/specs-ai"
+"Bug Tracker" = "https://github.com/vybhav72954/specs-ai/issues"
 
 [project.scripts]
 specs-ai = "specs_ai.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.version]
+path = "specs_ai/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["specs_ai"]

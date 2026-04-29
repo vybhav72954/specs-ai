@@ -6,6 +6,7 @@ from specs_ai.extractor import (
     HardwareSpecs,
     MotherboardInfo,
     RAMInfo,
+    StorageInfo,
     _adapter_ram_to_bytes,
     _clean_board_string,
     _is_real_gpu,
@@ -134,3 +135,20 @@ def test_memory_type_map_covers_common_generations() -> None:
     assert _MEMORY_TYPE_MAP[24] == "DDR3"
     assert _MEMORY_TYPE_MAP[26] == "DDR4"
     assert _MEMORY_TYPE_MAP[34] == "DDR5"
+
+
+def test_drives_is_list() -> None:
+    """drives must always be a list — never None or absent."""
+    drives = collect().drives
+    assert isinstance(drives, list)
+
+
+def test_drives_fields() -> None:
+    """Each StorageInfo entry must have the expected field types and no empty strings."""
+    for drive in collect().drives:
+        assert isinstance(drive, StorageInfo)
+        assert isinstance(drive.name, str)
+        assert isinstance(drive.size_gb, (float, str))
+        assert isinstance(drive.drive_type, str)
+        assert drive.name != ""
+        assert drive.drive_type != ""

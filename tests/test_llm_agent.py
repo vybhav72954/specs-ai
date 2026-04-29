@@ -26,6 +26,9 @@ _SAMPLE_SPECS: dict = {
     },
     "gpu": {"name": "NVIDIA GeForce GTX 1650", "vram_gb": 4.0},
     "motherboard": {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "FX505DT", "system_model": "FX505DT-BI7N10"},
+    "drives": [
+        {"name": "Samsung SSD 970 EVO", "size_gb": 500.0, "drive_type": "NVMe SSD"},
+    ],
 }
 
 
@@ -113,7 +116,43 @@ def test_build_prompt_restricts_to_listed_components() -> None:
     """Prompt must instruct the LLM not to recommend unlisted components."""
     prompt = _build_prompt(_SAMPLE_SPECS)
     assert "Do NOT mention, assume, or speculate about components that are not listed" in prompt
-    assert "storage" in prompt  # must name at least one excluded category
+    assert "PSU" in prompt  # must name at least one still-excluded category
+
+
+def test_build_prompt_storage_now_listed_not_excluded() -> None:
+    """Storage must appear in the listed-components clause, not the exclusion clause."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "Storage" in prompt  # listed as a known component
+    assert "storage, PSU" not in prompt  # no longer in the exclusion list
+
+
+def test_build_prompt_contains_drive_name() -> None:
+    """Prompt must include the drive model name."""
+    assert "Samsung SSD 970 EVO" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_drive_type() -> None:
+    """Prompt must include the drive type (e.g. NVMe SSD)."""
+    assert "NVMe SSD" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_storage_unknown_when_no_drives() -> None:
+    """Prompt must show 'Storage: Unknown' when drives list is empty."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["drives"] = []
+    assert "Storage:     Unknown" in _build_prompt(specs)
+
+
+def test_build_prompt_handles_multiple_drives() -> None:
+    """Prompt must list all drives when there are more than one."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["drives"] = [
+        {"name": "Samsung SSD 970 EVO", "size_gb": 500.0, "drive_type": "NVMe SSD"},
+        {"name": "WDC WD10EZEX", "size_gb": 1000.0, "drive_type": "SATA HDD"},
+    ]
+    prompt = _build_prompt(specs)
+    assert "Samsung SSD 970 EVO" in prompt
+    assert "WDC WD10EZEX" in prompt
 
 
 def test_build_prompt_scopes_closing_question() -> None:
