@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from google import genai
 
-_DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Values that mean "user didn't actually configure a key" — typically left over
 # from copying .env.example without editing.
@@ -84,6 +84,34 @@ def _build_prompt(specs: dict[str, Any]) -> str:
 
     wifi_name = wifi.get("name", "Unknown")
 
+    power = specs.get("power") or {}
+    has_battery = bool(power.get("has_battery", False))
+    if has_battery:
+        bat_name = power.get("battery_name", "Unknown") or "Unknown"
+        health_raw = power.get("health_pct", "Unknown")
+        health_str = f"{_format_value(health_raw)}%" if health_raw != "Unknown" else "Unknown"
+        design = power.get("design_capacity_mwh", "Unknown")
+        full_chg = power.get("full_charge_capacity_mwh", "Unknown")
+        if design != "Unknown" and full_chg != "Unknown":
+            cap_str = (
+                f",  Design: {_format_value(design)} mWh,"
+                f"  Current max: {_format_value(full_chg)} mWh"
+            )
+        else:
+            cap_str = ""
+        battery_line = f"\nBattery:     {bat_name}  (Health: {health_str}{cap_str})"
+        listed_components = "(CPU, RAM, GPU, Motherboard, Storage, WiFi, Battery)"
+        battery_note = (
+            "NOTE: If recommending a battery replacement for a laptop, always warn the user "
+            "that sourcing genuine OEM replacement batteries can be difficult as original parts "
+            "are often not readily available; advise using a certified service centre or a "
+            "carefully vetted third-party supplier.\n\n"
+        )
+    else:
+        battery_line = "\nNote:        Desktop - PSU and battery info not available via WMI."
+        listed_components = "(CPU, RAM, GPU, Motherboard, Storage, WiFi)"
+        battery_note = "\n"
+
     specs_block = (
         f"CPU:         {cpu.get('name', 'Unknown')} "
         f"({_format_value(cpu.get('physical_cores', '?'))}c / "
@@ -97,6 +125,7 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}{sys_model_part}\n"
         f"{storage_line}\n"
         f"WiFi:        {wifi_name}"
+        f"{battery_line}"
     )
 
     return (
@@ -108,16 +137,17 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         "---\n"
         f"{specs_block}\n"
         "---\n\n"
-        "IMPORTANT: Only recommend upgrades for the components listed above "
-        "(CPU, RAM, GPU, Motherboard, Storage, WiFi). "
+        f"IMPORTANT: Only recommend upgrades for the components listed above "
+        f"{listed_components}. "
         "Do NOT mention, assume, or speculate about components that are not listed "
         "(e.g. PSU, cooling, peripherals). "
-        "If you have no meaningful upgrade recommendation for a listed component, skip it.\n\n"
+        "If you have no meaningful upgrade recommendation for a listed component, skip it.\n"
+        f"{battery_note}"
         "What are the best upgrade paths for the components listed above?"
     )
 
 
-def get_recommendations(specs: dict[str, Any], model: str = _DEFAULT_MODEL) -> str:
+def get_recommendations(specs: dict[str, Any], model: str = DEFAULT_MODEL) -> str:
     """Build a prompt from specs and return Gemini's upgrade recommendations.
 
     Args:

@@ -30,6 +30,13 @@ _SAMPLE_SPECS: dict = {
         {"name": "Samsung SSD 970 EVO", "size_gb": 500.0, "drive_type": "NVMe SSD"},
     ],
     "wifi": {"name": "Intel(R) Wi-Fi 6 AX200 160MHz"},
+    "power": {
+        "battery_name": "ASUS Battery",
+        "design_capacity_mwh": 48000,
+        "full_charge_capacity_mwh": 37440,
+        "health_pct": 78,
+        "has_battery": True,
+    },
 }
 
 
@@ -117,7 +124,7 @@ def test_build_prompt_restricts_to_listed_components() -> None:
     """Prompt must instruct the LLM not to recommend unlisted components."""
     prompt = _build_prompt(_SAMPLE_SPECS)
     assert "Do NOT mention, assume, or speculate about components that are not listed" in prompt
-    assert "PSU" in prompt  # must name at least one still-excluded category
+    assert "PSU" in prompt  # PSU remains excluded — we cannot detect it
 
 
 def test_build_prompt_storage_now_listed_not_excluded() -> None:
@@ -173,7 +180,63 @@ def test_build_prompt_wifi_in_listed_components() -> None:
     prompt = _build_prompt(_SAMPLE_SPECS)
     assert "WiFi" in prompt
     # The IMPORTANT clause must name WiFi alongside the other tracked components.
-    assert "CPU, RAM, GPU, Motherboard, Storage, WiFi" in prompt
+    assert "CPU, RAM, GPU, Motherboard, Storage, WiFi, Battery" in prompt
+
+
+def test_build_prompt_contains_battery_name() -> None:
+    """Prompt must include the battery name for laptops."""
+    assert "ASUS Battery" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_contains_battery_health() -> None:
+    """Prompt must include the battery health percentage for laptops."""
+    assert "78%" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_battery_in_listed_components() -> None:
+    """Battery must appear in the listed-components IMPORTANT clause."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "CPU, RAM, GPU, Motherboard, Storage, WiFi, Battery" in prompt
+
+
+def test_build_prompt_battery_replacement_callout() -> None:
+    """Prompt must warn about difficulty sourcing genuine OEM battery replacements."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "original parts" in prompt
+
+
+def test_build_prompt_laptop_partial_battery_data() -> None:
+    """Laptop with battery present but capacity readings missing must omit the capacity tail."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["power"] = {
+        "battery_name": "ASUS Battery",
+        "design_capacity_mwh": "Unknown",
+        "full_charge_capacity_mwh": "Unknown",
+        "health_pct": "Unknown",
+        "has_battery": True,
+    }
+    prompt = _build_prompt(specs)
+    assert "ASUS Battery" in prompt
+    assert "Health: Unknown" in prompt
+    assert "mWh" not in prompt  # capacity tail must be absent
+    assert "original parts" in prompt  # OEM callout still applies on laptops
+
+
+def test_build_prompt_desktop_shows_psu_callout() -> None:
+    """Desktop prompt must note that PSU/battery are unavailable, with no Battery section."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["power"] = {
+        "battery_name": "Unknown",
+        "design_capacity_mwh": "Unknown",
+        "full_charge_capacity_mwh": "Unknown",
+        "health_pct": "Unknown",
+        "has_battery": False,
+    }
+    prompt = _build_prompt(specs)
+    assert "Desktop" in prompt
+    assert "PSU" in prompt
+    assert "Battery" not in prompt
+    assert "original parts" not in prompt  # OEM callout must also be absent
 
 
 # ---- _format_value ----------------------------------------------------------

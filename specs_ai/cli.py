@@ -6,9 +6,7 @@ import sys
 
 from specs_ai import __version__
 from specs_ai.extractor import HardwareSpecs, collect
-from specs_ai.llm_agent import get_recommendations
-
-_DEFAULT_MODEL = "gemini-2.5-flash"
+from specs_ai.llm_agent import DEFAULT_MODEL, get_recommendations
 
 
 def _fmt(value: object, suffix: str = "") -> str:
@@ -50,6 +48,19 @@ def _print_specs(specs: HardwareSpecs) -> None:
     else:
         print("Storage:     Unknown")
     print(f"WiFi:        {specs.wifi.name}")
+    p = specs.power
+    if p.has_battery:
+        health_str = f"{_fmt(p.health_pct)}%" if p.health_pct != "Unknown" else "Unknown"
+        if p.design_capacity_mwh != "Unknown" and p.full_charge_capacity_mwh != "Unknown":
+            cap_str = (
+                f",  {_fmt(p.design_capacity_mwh)} mWh design"
+                f" -> {_fmt(p.full_charge_capacity_mwh)} mWh max"
+            )
+        else:
+            cap_str = ""
+        print(f"Battery:     {p.battery_name}  (Health: {health_str}{cap_str})")
+    else:
+        print("Note:        Desktop - PSU and battery info not available via WMI.")
     print("-" * 44)
 
 
@@ -71,9 +82,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        default=_DEFAULT_MODEL,
+        default=DEFAULT_MODEL,
         metavar="MODEL",
-        help=f"Gemini model ID to use (default: {_DEFAULT_MODEL}).",
+        help=f"Gemini model ID to use (default: {DEFAULT_MODEL}).",
     )
     return parser.parse_args(argv)
 

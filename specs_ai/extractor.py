@@ -122,6 +122,18 @@ class WiFiInfo:
 
 
 @dataclass
+class PowerInfo:
+    """Battery health snapshot. has_battery=False means no battery was detected
+    (typically a desktop, but also a laptop with the battery removed or a UPS-less rig)."""
+
+    battery_name: str        # Win32_Battery.Name or "Unknown"
+    design_capacity_mwh: int | str   # original capacity in mWh; "Unknown" if unavailable
+    full_charge_capacity_mwh: int | str  # current max charge in mWh; "Unknown" if unavailable
+    health_pct: int | str    # (full_charge / design) * 100, rounded; "Unknown" if unavailable
+    has_battery: bool        # True when Win32_Battery returned at least one battery
+
+
+@dataclass
 class HardwareSpecs:
     """Complete hardware snapshot of the local machine."""
 
@@ -131,6 +143,7 @@ class HardwareSpecs:
     motherboard: MotherboardInfo
     drives: list[StorageInfo]
     wifi: WiFiInfo
+    power: PowerInfo
 
 
 def _clean_board_string(value: str | None) -> str:
@@ -467,6 +480,51 @@ def _get_wifi() -> WiFiInfo:
     return WiFiInfo(name=name)
 
 
+def _get_power() -> PowerInfo:
+    """Extract battery health via WMI; returns has_battery=False when no battery is detected.
+
+    Primary source: root/WMI BatteryStaticData (design capacity) and
+    BatteryFullChargedCapacity (current max capacity), both in mWh.
+    Battery presence is detected via Win32_Battery; no entry means no battery
+    (typically a desktop).
+    """
+    has_battery = False
+    battery_name: str = "Unknown"
+    design_mwh: int | str = "Unknown"
+    full_mwh: int | str = "Unknown"
+    health_pct: int | str = "Unknown"
+
+    try:
+        batteries = wmi.WMI().Win32_Battery()
+        if batteries:
+            has_battery = True
+            battery_name = _clean_board_string(batteries[0].Name)
+    except Exception:
+        pass
+
+    if has_battery:
+        try:
+            root_wmi = wmi.WMI(namespace="root/WMI")
+            static = root_wmi.BatteryStaticData()
+            full = root_wmi.BatteryFullChargedCapacity()
+            if static:
+                design_mwh = int(static[0].DesignedCapacity)
+            if full:
+                full_mwh = int(full[0].FullChargedCapacity)
+            if isinstance(design_mwh, int) and isinstance(full_mwh, int) and design_mwh > 0:
+                health_pct = round((full_mwh / design_mwh) * 100)
+        except Exception:
+            pass
+
+    return PowerInfo(
+        battery_name=battery_name,
+        design_capacity_mwh=design_mwh,
+        full_charge_capacity_mwh=full_mwh,
+        health_pct=health_pct,
+        has_battery=has_battery,
+    )
+
+
 def collect() -> HardwareSpecs:
     """Collect all hardware specs from this machine and return a HardwareSpecs instance."""
     return HardwareSpecs(
@@ -476,4 +534,5 @@ def collect() -> HardwareSpecs:
         motherboard=_get_motherboard(),
         drives=_get_drives(),
         wifi=_get_wifi(),
+        power=_get_power(),
     )

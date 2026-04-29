@@ -4,8 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from specs_ai.cli import _DEFAULT_MODEL, _fmt, _parse_args, _print_specs, main
-from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, RAMInfo, StorageInfo, WiFiInfo
+from specs_ai.cli import _fmt, _parse_args, _print_specs, main
+from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, PowerInfo, RAMInfo, StorageInfo, WiFiInfo
+from specs_ai.llm_agent import DEFAULT_MODEL
 
 
 # ---- fixtures ----------------------------------------------------------------
@@ -25,6 +26,13 @@ def sample_specs() -> HardwareSpecs:
         ),
         drives=[StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD")],
         wifi=WiFiInfo(name="Intel(R) Wi-Fi 6 AX200 160MHz"),
+        power=PowerInfo(
+            battery_name="ASUS Battery",
+            design_capacity_mwh=48000,
+            full_charge_capacity_mwh=37440,
+            health_pct=78,
+            has_battery=True,
+        ),
     )
 
 
@@ -38,6 +46,13 @@ def unknown_specs() -> HardwareSpecs:
         motherboard=MotherboardInfo(manufacturer="Unknown", model="Unknown", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(
+            battery_name="Unknown",
+            design_capacity_mwh="Unknown",
+            full_charge_capacity_mwh="Unknown",
+            health_pct="Unknown",
+            has_battery=False,
+        ),
     )
 
 
@@ -81,7 +96,7 @@ def test_parse_args_defaults() -> None:
     """No flags: specs_only is False and model is the package default."""
     args = _parse_args([])
     assert args.specs_only is False
-    assert args.model == _DEFAULT_MODEL
+    assert args.model == DEFAULT_MODEL
 
 
 def test_parse_args_specs_only_flag() -> None:
@@ -190,6 +205,8 @@ def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
             StorageInfo(name="WDC WD10EZEX", size_gb=1000.0, drive_type="SATA HDD"),
         ],
         wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
+                        full_charge_capacity_mwh="Unknown", health_pct="Unknown", has_battery=False),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -215,6 +232,8 @@ def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixt
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
+                        full_charge_capacity_mwh="Unknown", health_pct="Unknown", has_battery=False),
     )
     _print_specs(specs)
     assert "  @" not in capsys.readouterr().out
@@ -311,3 +330,45 @@ def test_print_specs_shows_unknown_wifi(capsys: pytest.CaptureFixture, unknown_s
     """'Unknown' WiFi must still appear in output (not silently omitted)."""
     _print_specs(unknown_specs)
     assert "WiFi:" in capsys.readouterr().out
+
+
+def test_print_specs_shows_battery_health(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Laptop battery name and health percentage must appear in output."""
+    _print_specs(sample_specs)
+    out = capsys.readouterr().out
+    assert "ASUS Battery" in out
+    assert "78%" in out
+    assert "48000 mWh" in out
+
+
+def test_print_specs_laptop_partial_battery_data(capsys: pytest.CaptureFixture) -> None:
+    """Laptop with battery present but capacity readings missing must show only Health."""
+    specs = HardwareSpecs(
+        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000),
+        ram=RAMInfo(total_gb=16.0, slots_used=2, speed_mhz=3200, ram_type="DDR4"),
+        gpu=GPUInfo(name="GPU", vram_gb=4.0),
+        motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
+        drives=[],
+        wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(
+            battery_name="ASUS Battery",
+            design_capacity_mwh="Unknown",
+            full_charge_capacity_mwh="Unknown",
+            health_pct="Unknown",
+            has_battery=True,
+        ),
+    )
+    _print_specs(specs)
+    out = capsys.readouterr().out
+    assert "ASUS Battery" in out
+    assert "Health: Unknown" in out
+    assert "mWh" not in out  # capacity tail must be absent
+
+
+def test_print_specs_desktop_shows_psu_callout(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
+    """Desktop (has_battery=False) must show a note that PSU and battery are not available."""
+    _print_specs(unknown_specs)
+    out = capsys.readouterr().out
+    assert "Desktop" in out
+    assert "PSU" in out
+    assert "Battery" not in out
