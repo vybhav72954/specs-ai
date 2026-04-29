@@ -29,6 +29,7 @@ _SAMPLE_SPECS: dict = {
     "drives": [
         {"name": "Samsung SSD 970 EVO", "size_gb": 500.0, "drive_type": "NVMe SSD"},
     ],
+    "wifi": {"name": "Intel(R) Wi-Fi 6 AX200 160MHz"},
 }
 
 
@@ -160,6 +161,19 @@ def test_build_prompt_scopes_closing_question() -> None:
     prompt = _build_prompt(_SAMPLE_SPECS)
     assert "components listed above" in prompt
     assert "What are the best upgrade paths for this machine?" not in prompt
+
+
+def test_build_prompt_contains_wifi_name() -> None:
+    """Prompt must include the WiFi adapter name."""
+    assert "Intel(R) Wi-Fi 6 AX200 160MHz" in _build_prompt(_SAMPLE_SPECS)
+
+
+def test_build_prompt_wifi_in_listed_components() -> None:
+    """WiFi must appear in the listed-components IMPORTANT clause."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "WiFi" in prompt
+    # The IMPORTANT clause must name WiFi alongside the other tracked components.
+    assert "CPU, RAM, GPU, Motherboard, Storage, WiFi" in prompt
 
 
 # ---- _format_value ----------------------------------------------------------

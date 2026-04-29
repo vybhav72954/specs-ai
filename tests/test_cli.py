@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from specs_ai.cli import _DEFAULT_MODEL, _fmt, _parse_args, _print_specs, main
-from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, RAMInfo, StorageInfo
+from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, RAMInfo, StorageInfo, WiFiInfo
 
 
 # ---- fixtures ----------------------------------------------------------------
@@ -24,6 +24,7 @@ def sample_specs() -> HardwareSpecs:
             system_model="FX505DT-BI7N10",
         ),
         drives=[StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD")],
+        wifi=WiFiInfo(name="Intel(R) Wi-Fi 6 AX200 160MHz"),
     )
 
 
@@ -36,6 +37,7 @@ def unknown_specs() -> HardwareSpecs:
         gpu=GPUInfo(name="Unknown", vram_gb="Unknown"),
         motherboard=MotherboardInfo(manufacturer="Unknown", model="Unknown", system_model="Unknown"),
         drives=[],
+        wifi=WiFiInfo(name="Unknown"),
     )
 
 
@@ -187,6 +189,7 @@ def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
             StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD"),
             StorageInfo(name="WDC WD10EZEX", size_gb=1000.0, drive_type="SATA HDD"),
         ],
+        wifi=WiFiInfo(name="Unknown"),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -211,6 +214,7 @@ def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixt
         gpu=GPUInfo(name="GPU", vram_gb=2.0),
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
         drives=[],
+        wifi=WiFiInfo(name="Unknown"),
     )
     _print_specs(specs)
     assert "  @" not in capsys.readouterr().out
@@ -295,3 +299,15 @@ def test_main_prints_recommendations(
     ):
         main()
     assert "Add more RAM." in capsys.readouterr().out
+
+
+def test_print_specs_shows_wifi_name(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must contain the WiFi adapter name."""
+    _print_specs(sample_specs)
+    assert "Intel(R) Wi-Fi 6 AX200 160MHz" in capsys.readouterr().out
+
+
+def test_print_specs_shows_unknown_wifi(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
+    """'Unknown' WiFi must still appear in output (not silently omitted)."""
+    _print_specs(unknown_specs)
+    assert "WiFi:" in capsys.readouterr().out

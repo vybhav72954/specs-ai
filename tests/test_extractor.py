@@ -7,9 +7,11 @@ from specs_ai.extractor import (
     MotherboardInfo,
     RAMInfo,
     StorageInfo,
+    WiFiInfo,
     _adapter_ram_to_bytes,
     _clean_board_string,
     _is_real_gpu,
+    _is_real_wifi,
     _MEMORY_TYPE_MAP,
     collect,
 )
@@ -152,3 +154,37 @@ def test_drives_fields() -> None:
         assert isinstance(drive.drive_type, str)
         assert drive.name != ""
         assert drive.drive_type != ""
+
+
+def test_wifi_fields() -> None:
+    """WiFiInfo must always be present with a non-empty string name."""
+    wifi = collect().wifi
+    assert isinstance(wifi, WiFiInfo)
+    assert isinstance(wifi.name, str)
+    assert wifi.name != ""
+
+
+# ---- unit: WiFi helpers -------------------------------------------------------
+
+
+def test_is_real_wifi_accepts_wifi_adapters() -> None:
+    """Common WiFi adapter names and types must be accepted."""
+    assert _is_real_wifi("Intel(R) Wi-Fi 6 AX200 160MHz", None)
+    assert _is_real_wifi("Realtek RTL8822CE Wireless LAN 802.11ac PCI-E NIC", None)
+    assert _is_real_wifi("Qualcomm Atheros QCA9377 Wireless Network Adapter", None)
+    assert _is_real_wifi("Some Adapter", "Ethernet 802.11")
+
+
+def test_is_real_wifi_rejects_virtual_adapters() -> None:
+    """Virtual and Bluetooth adapters must be rejected."""
+    assert not _is_real_wifi("Microsoft Wi-Fi Direct Virtual Adapter", None)
+    assert not _is_real_wifi("Microsoft Hosted Network Virtual Adapter", None)
+    assert not _is_real_wifi("Bluetooth Device (Personal Area Network)", None)
+    assert not _is_real_wifi(None, None)
+    assert not _is_real_wifi("", None)
+
+
+def test_is_real_wifi_rejects_wired_adapters() -> None:
+    """Wired Ethernet adapters must not be treated as WiFi."""
+    assert not _is_real_wifi("Realtek PCIe GbE Family Controller", None)
+    assert not _is_real_wifi("Intel(R) Ethernet Connection I219-V", "Ethernet 802.3")
