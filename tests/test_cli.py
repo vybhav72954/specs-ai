@@ -340,6 +340,30 @@ def test_print_specs_shows_battery_health(capsys: pytest.CaptureFixture, sample_
     assert "48000 mWh" in out
 
 
+def test_print_specs_laptop_partial_battery_data(capsys: pytest.CaptureFixture) -> None:
+    """Laptop with battery present but capacity readings missing must show only Health."""
+    specs = HardwareSpecs(
+        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000),
+        ram=RAMInfo(total_gb=16.0, slots_used=2, speed_mhz=3200, ram_type="DDR4"),
+        gpu=GPUInfo(name="GPU", vram_gb=4.0),
+        motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
+        drives=[],
+        wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(
+            battery_name="ASUS Battery",
+            design_capacity_mwh="Unknown",
+            full_charge_capacity_mwh="Unknown",
+            health_pct="Unknown",
+            is_laptop=True,
+        ),
+    )
+    _print_specs(specs)
+    out = capsys.readouterr().out
+    assert "ASUS Battery" in out
+    assert "Health: Unknown" in out
+    assert "mWh" not in out  # capacity tail must be absent
+
+
 def test_print_specs_desktop_shows_psu_callout(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
     """Desktop (is_laptop=False) must show a note that PSU and battery are not available."""
     _print_specs(unknown_specs)

@@ -1,8 +1,9 @@
 # specs-ai
 
-AI-powered hardware upgrade assistant. Reads your machine's CPU, RAM, GPU, and motherboard
-specs via WMI and psutil, then asks a Gemini-powered LLM to give you specific, actionable
-upgrade recommendations for your exact hardware.
+AI-powered hardware upgrade assistant. Reads your machine's CPU, RAM, GPU, motherboard,
+storage, WiFi adapter, and battery health (on laptops) via WMI and psutil, then asks a
+Gemini-powered LLM to give you specific, actionable upgrade recommendations for your
+exact hardware.
 
 Currently Windows-only.
 

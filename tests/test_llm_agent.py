@@ -205,6 +205,23 @@ def test_build_prompt_battery_replacement_callout() -> None:
     assert "original parts" in prompt
 
 
+def test_build_prompt_laptop_partial_battery_data() -> None:
+    """Laptop with battery present but capacity readings missing must omit the capacity tail."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["power"] = {
+        "battery_name": "ASUS Battery",
+        "design_capacity_mwh": "Unknown",
+        "full_charge_capacity_mwh": "Unknown",
+        "health_pct": "Unknown",
+        "is_laptop": True,
+    }
+    prompt = _build_prompt(specs)
+    assert "ASUS Battery" in prompt
+    assert "Health: Unknown" in prompt
+    assert "mWh" not in prompt  # capacity tail must be absent
+    assert "original parts" in prompt  # OEM callout still applies on laptops
+
+
 def test_build_prompt_desktop_shows_psu_callout() -> None:
     """Desktop prompt must note that PSU/battery are unavailable, with no Battery section."""
     specs = dict(_SAMPLE_SPECS)
