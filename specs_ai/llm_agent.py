@@ -66,6 +66,21 @@ def _build_prompt(specs: dict[str, Any]) -> str:
     sys_model = mb.get("system_model", "Unknown")
     sys_model_part = f" [{sys_model}]" if sys_model and sys_model != "Unknown" else ""
 
+    drives = specs.get("drives") or []
+    if drives:
+        drive_strs = [
+            f"{d.get('name', 'Unknown')} "
+            f"({_format_value(d.get('size_gb', '?'))} GB, {d.get('drive_type', 'Unknown')})"
+            for d in drives
+        ]
+        if len(drive_strs) == 1:
+            storage_line = f"Storage:     {drive_strs[0]}"
+        else:
+            continuation = "\n             "
+            storage_line = "Storage:     " + continuation.join(drive_strs)
+    else:
+        storage_line = "Storage:     Unknown"
+
     specs_block = (
         f"CPU:         {cpu.get('name', 'Unknown')} "
         f"({_format_value(cpu.get('physical_cores', '?'))}c / "
@@ -76,7 +91,8 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         f"- {_format_value(ram.get('slots_used', '?'))} slot(s) used\n"
         f"GPU:         {gpu.get('name', 'Unknown')} "
         f"({_format_value(gpu.get('vram_gb', '?'))} GB VRAM)\n"
-        f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}{sys_model_part}"
+        f"Motherboard: {mb.get('manufacturer', 'Unknown')} {mb.get('model', 'Unknown')}{sys_model_part}\n"
+        f"{storage_line}"
     )
 
     return (
@@ -89,9 +105,9 @@ def _build_prompt(specs: dict[str, Any]) -> str:
         f"{specs_block}\n"
         "---\n\n"
         "IMPORTANT: Only recommend upgrades for the components listed above "
-        "(CPU, RAM, GPU, Motherboard). "
+        "(CPU, RAM, GPU, Motherboard, Storage). "
         "Do NOT mention, assume, or speculate about components that are not listed "
-        "(e.g. storage, PSU, cooling, peripherals). "
+        "(e.g. PSU, cooling, peripherals). "
         "If you have no meaningful upgrade recommendation for a listed component, skip it.\n\n"
         "What are the best upgrade paths for the components listed above?"
     )

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from specs_ai.cli import _DEFAULT_MODEL, _fmt, _parse_args, _print_specs, main
-from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, RAMInfo
+from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, RAMInfo, StorageInfo
 
 
 # ---- fixtures ----------------------------------------------------------------
@@ -23,6 +23,7 @@ def sample_specs() -> HardwareSpecs:
             model="FX505DT",
             system_model="FX505DT-BI7N10",
         ),
+        drives=[StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD")],
     )
 
 
@@ -34,6 +35,7 @@ def unknown_specs() -> HardwareSpecs:
         ram=RAMInfo(total_gb="Unknown", slots_used="Unknown", speed_mhz="Unknown", ram_type="Unknown"),
         gpu=GPUInfo(name="Unknown", vram_gb="Unknown"),
         motherboard=MotherboardInfo(manufacturer="Unknown", model="Unknown", system_model="Unknown"),
+        drives=[],
     )
 
 
@@ -165,6 +167,42 @@ def test_print_specs_omits_unknown_system_model(
     assert "[Unknown]" not in capsys.readouterr().out
 
 
+def test_print_specs_single_drive(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must show drive name, size, and type for a single drive."""
+    _print_specs(sample_specs)
+    out = capsys.readouterr().out
+    assert "Samsung SSD 970 EVO" in out
+    assert "500 GB" in out
+    assert "NVMe SSD" in out
+
+
+def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
+    """Output must list all drives when more than one is present."""
+    specs = HardwareSpecs(
+        cpu=CPUInfo(name="CPU", physical_cores=4, logical_cores=8, max_clock_mhz=3000),
+        ram=RAMInfo(total_gb=16.0, slots_used=2, speed_mhz=3200, ram_type="DDR4"),
+        gpu=GPUInfo(name="GPU", vram_gb=4.0),
+        motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
+        drives=[
+            StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD"),
+            StorageInfo(name="WDC WD10EZEX", size_gb=1000.0, drive_type="SATA HDD"),
+        ],
+    )
+    _print_specs(specs)
+    out = capsys.readouterr().out
+    assert "Storage (2):" in out
+    assert "Samsung SSD 970 EVO" in out
+    assert "WDC WD10EZEX" in out
+
+
+def test_print_specs_no_drives_shows_unknown(
+    capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs
+) -> None:
+    """Empty drives list must display 'Storage: Unknown'."""
+    _print_specs(unknown_specs)
+    assert "Storage:     Unknown" in capsys.readouterr().out
+
+
 def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixture) -> None:
     """Unknown RAM type must not produce a double space before '@'."""
     specs = HardwareSpecs(
@@ -172,6 +210,7 @@ def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixt
         ram=RAMInfo(total_gb=8.0, slots_used=1, speed_mhz=3200, ram_type="Unknown"),
         gpu=GPUInfo(name="GPU", vram_gb=2.0),
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
+        drives=[],
     )
     _print_specs(specs)
     assert "  @" not in capsys.readouterr().out

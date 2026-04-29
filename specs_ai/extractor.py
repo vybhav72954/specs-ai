@@ -42,6 +42,20 @@ _GENERIC_BOARD_STRINGS: frozenset[str] = frozenset(
     }
 )
 
+_BUS_TYPE_NAMES: dict[int, str] = {
+    3: "ATA",
+    11: "SATA",
+    17: "NVMe",
+}
+
+_MEDIA_TYPE_NAMES: dict[int, str] = {
+    3: "HDD",
+    4: "SSD",
+}
+
+# Bus types that indicate removable media — excluded from storage reporting.
+_REMOVABLE_BUS_TYPES: frozenset[int] = frozenset({7, 12, 13})  # USB, SD, MMC
+
 
 @dataclass
 class CPUInfo:
@@ -81,6 +95,15 @@ class MotherboardInfo:
 
 
 @dataclass
+class StorageInfo:
+    """Physical storage device name, capacity, and drive type."""
+
+    name: str
+    size_gb: float | str
+    drive_type: str  # e.g. "NVMe SSD", "SATA SSD", "SATA HDD", "ATA HDD", "Unknown"
+
+
+@dataclass
 class HardwareSpecs:
     """Complete hardware snapshot of the local machine."""
 
@@ -88,6 +111,7 @@ class HardwareSpecs:
     ram: RAMInfo
     gpu: GPUInfo
     motherboard: MotherboardInfo
+    drives: list[StorageInfo]
 
 
 def _clean_board_string(value: str | None) -> str:
@@ -327,6 +351,72 @@ def _get_motherboard() -> MotherboardInfo:
     return MotherboardInfo(manufacturer=manufacturer, model=model, system_model=system_model)
 
 
+def _get_drives() -> list[StorageInfo]:
+    """Extract physical storage devices via MSFT_PhysicalDisk, falling back to Win32_DiskDrive.
+
+    Primary source is MSFT_PhysicalDisk (root/microsoft/windows/storage namespace),
+    which correctly reports MediaType (SSD/HDD) and BusType (NVMe/SATA/ATA).
+    Removable drives (USB, SD, MMC) are excluded. Falls back to Win32_DiskDrive
+    for drive name and size only when the primary source is unavailable.
+    """
+    drives: list[StorageInfo] = []
+
+    try:
+        storage_wmi = wmi.WMI(namespace="root/microsoft/windows/storage")
+        for disk in storage_wmi.MSFT_PhysicalDisk():
+            try:
+                bus_type = int(disk.BusType or 0)
+            except (TypeError, ValueError):
+                bus_type = 0
+            if bus_type in _REMOVABLE_BUS_TYPES:
+                continue
+
+            try:
+                media_type = int(disk.MediaType or 0)
+            except (TypeError, ValueError):
+                media_type = 0
+
+            name = _clean_board_string(disk.FriendlyName)
+
+            try:
+                size_gb: float | str = round(int(disk.Size) / (1024**3), 1)
+            except (TypeError, ValueError):
+                size_gb = "Unknown"
+
+            bus_label = _BUS_TYPE_NAMES.get(bus_type, "")
+            media_label = _MEDIA_TYPE_NAMES.get(media_type, "")
+            if bus_label and media_label:
+                drive_type = f"{bus_label} {media_label}"
+            elif media_label:
+                drive_type = media_label
+            else:
+                drive_type = "Unknown"
+
+            drives.append(StorageInfo(name=name, size_gb=size_gb, drive_type=drive_type))
+
+        if drives:
+            return drives
+    except Exception:
+        pass
+
+    # Fallback: Win32_DiskDrive — drive type detection is unreliable here,
+    # but at least returns name and size for all fixed drives.
+    try:
+        for disk in wmi.WMI().Win32_DiskDrive():
+            if (disk.InterfaceType or "").strip().upper() == "USB":
+                continue
+            name = _clean_board_string(disk.Model)
+            try:
+                size_gb = round(int(disk.Size) / (1024**3), 1)
+            except (TypeError, ValueError):
+                size_gb = "Unknown"
+            drives.append(StorageInfo(name=name, size_gb=size_gb, drive_type="Unknown"))
+    except Exception:
+        pass
+
+    return drives
+
+
 def collect() -> HardwareSpecs:
     """Collect all hardware specs from this machine and return a HardwareSpecs instance."""
     return HardwareSpecs(
@@ -334,4 +424,5 @@ def collect() -> HardwareSpecs:
         ram=_get_ram(),
         gpu=_get_gpu(),
         motherboard=_get_motherboard(),
+        drives=_get_drives(),
     )
