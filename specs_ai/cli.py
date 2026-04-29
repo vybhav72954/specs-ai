@@ -50,6 +50,17 @@ def _print_specs(specs: HardwareSpecs) -> None:
     else:
         print("Storage:     Unknown")
     print(f"WiFi:        {specs.wifi.name}")
+    p = specs.power
+    if p.is_laptop:
+        health_str = f"{_fmt(p.health_pct)}%" if p.health_pct != "Unknown" else "Unknown"
+        if p.design_capacity_mwh != "Unknown" and p.full_charge_capacity_mwh != "Unknown":
+            cap_str = (
+                f",  {_fmt(p.design_capacity_mwh)} mWh design"
+                f" -> {_fmt(p.full_charge_capacity_mwh)} mWh max"
+            )
+        else:
+            cap_str = ""
+        print(f"Battery:     {p.battery_name}  (Health: {health_str}{cap_str})")
     print("-" * 44)
 
 

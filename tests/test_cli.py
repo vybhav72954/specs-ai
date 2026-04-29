@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from specs_ai.cli import _DEFAULT_MODEL, _fmt, _parse_args, _print_specs, main
-from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, RAMInfo, StorageInfo, WiFiInfo
+from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, PowerInfo, RAMInfo, StorageInfo, WiFiInfo
 
 
 # ---- fixtures ----------------------------------------------------------------
@@ -25,6 +25,13 @@ def sample_specs() -> HardwareSpecs:
         ),
         drives=[StorageInfo(name="Samsung SSD 970 EVO", size_gb=500.0, drive_type="NVMe SSD")],
         wifi=WiFiInfo(name="Intel(R) Wi-Fi 6 AX200 160MHz"),
+        power=PowerInfo(
+            battery_name="ASUS Battery",
+            design_capacity_mwh=48000,
+            full_charge_capacity_mwh=37440,
+            health_pct=78,
+            is_laptop=True,
+        ),
     )
 
 
@@ -38,6 +45,13 @@ def unknown_specs() -> HardwareSpecs:
         motherboard=MotherboardInfo(manufacturer="Unknown", model="Unknown", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(
+            battery_name="Unknown",
+            design_capacity_mwh="Unknown",
+            full_charge_capacity_mwh="Unknown",
+            health_pct="Unknown",
+            is_laptop=False,
+        ),
     )
 
 
@@ -190,6 +204,8 @@ def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
             StorageInfo(name="WDC WD10EZEX", size_gb=1000.0, drive_type="SATA HDD"),
         ],
         wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
+                        full_charge_capacity_mwh="Unknown", health_pct="Unknown", is_laptop=False),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -215,6 +231,8 @@ def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixt
         motherboard=MotherboardInfo(manufacturer="Mfr", model="Mdl", system_model="Unknown"),
         drives=[],
         wifi=WiFiInfo(name="Unknown"),
+        power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
+                        full_charge_capacity_mwh="Unknown", health_pct="Unknown", is_laptop=False),
     )
     _print_specs(specs)
     assert "  @" not in capsys.readouterr().out
@@ -311,3 +329,18 @@ def test_print_specs_shows_unknown_wifi(capsys: pytest.CaptureFixture, unknown_s
     """'Unknown' WiFi must still appear in output (not silently omitted)."""
     _print_specs(unknown_specs)
     assert "WiFi:" in capsys.readouterr().out
+
+
+def test_print_specs_shows_battery_health(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Laptop battery name and health percentage must appear in output."""
+    _print_specs(sample_specs)
+    out = capsys.readouterr().out
+    assert "ASUS Battery" in out
+    assert "78%" in out
+    assert "48000 mWh" in out
+
+
+def test_print_specs_desktop_omits_battery(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
+    """Desktop (is_laptop=False) must not print a Battery line at all."""
+    _print_specs(unknown_specs)
+    assert "Battery" not in capsys.readouterr().out

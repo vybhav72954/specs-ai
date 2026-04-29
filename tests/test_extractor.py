@@ -5,6 +5,7 @@ from specs_ai.extractor import (
     GPUInfo,
     HardwareSpecs,
     MotherboardInfo,
+    PowerInfo,
     RAMInfo,
     StorageInfo,
     WiFiInfo,
@@ -72,6 +73,7 @@ def test_no_empty_strings() -> None:
     assert specs.motherboard.model != ""
     assert specs.motherboard.system_model != ""
     assert specs.ram.ram_type != ""
+    assert specs.power.battery_name != ""
 
 
 # ---- unit: pure helpers ------------------------------------------------------
@@ -162,6 +164,20 @@ def test_wifi_fields() -> None:
     assert isinstance(wifi, WiFiInfo)
     assert isinstance(wifi.name, str)
     assert wifi.name != ""
+
+
+def test_power_fields() -> None:
+    """PowerInfo must always be present with correct field types."""
+    power = collect().power
+    assert isinstance(power, PowerInfo)
+    assert isinstance(power.battery_name, str)
+    assert isinstance(power.is_laptop, bool)
+    assert isinstance(power.design_capacity_mwh, (int, str))
+    assert isinstance(power.full_charge_capacity_mwh, (int, str))
+    assert isinstance(power.health_pct, (int, str))
+    assert power.battery_name != ""
+    if power.is_laptop and isinstance(power.health_pct, int):
+        assert 0 <= power.health_pct <= 200  # sanity bound; >100 possible on new batteries
 
 
 # ---- unit: WiFi helpers -------------------------------------------------------
