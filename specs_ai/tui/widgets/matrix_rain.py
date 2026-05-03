@@ -56,12 +56,15 @@ class _Stream:
         self.delay = random.randint(0, 8)  # 0-1s at ~8 FPS
 
 
+_STREAMS_PER_COLUMN = 3   # number of overlapping streams in each gutter column
+
+
 class MatrixRain(Widget):
     """A narrow column of falling Matrix-style characters."""
 
     DEFAULT_CSS = """
     MatrixRain {
-        width: 3;
+        width: 2;
         height: 100%;
         background: #0A0A0A;
     }
@@ -72,22 +75,27 @@ class MatrixRain(Widget):
         self._columns = columns
         self._streams: list[list[_Stream]] = []
 
+    def _make_streams(self, height: int) -> list[list[_Stream]]:
+        """Build a fresh stream-grid sized for the current widget height.
+
+        Each column holds several overlapping _Stream objects so the rain
+        looks dense rather than a single lonely trail.
+        """
+        return [
+            [_Stream(height) for _ in range(_STREAMS_PER_COLUMN)]
+            for _ in range(self._columns)
+        ]
+
     def on_mount(self) -> None:
         """Initialize streams and start the animation timer."""
         height = self.size.height or 30
-        self._streams = [
-            [_Stream(height) for _ in range(1)]
-            for _ in range(self._columns)
-        ]
+        self._streams = self._make_streams(height)
         self.set_interval(1 / 8, self._tick)
 
     def on_resize(self) -> None:
         """Reinitialize streams when terminal is resized."""
         height = self.size.height or 30
-        self._streams = [
-            [_Stream(height) for _ in range(1)]
-            for _ in range(self._columns)
-        ]
+        self._streams = self._make_streams(height)
 
     def _tick(self) -> None:
         """Advance all streams and refresh the display."""
