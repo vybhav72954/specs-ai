@@ -22,8 +22,14 @@ def fmt(value: int | float | str | None, suffix: str = "") -> str:
 
 
 def usage_bar(percent: float, width: int = 16) -> str:
-    """Return a text-based usage bar like '████████░░░░ 62%'."""
+    """Return a text-based usage bar like '████████░░░░ 62%'.
+
+    Clamps `filled`/`empty` so values outside 0-100 (e.g. battery health
+    above 100% on a fresh cell, or a negative reading from a glitchy sensor)
+    don't produce a malformed bar with negative-length string multiplications.
+    """
     filled = int(percent / 100 * width)
+    filled = max(0, min(filled, width))
     empty = width - filled
     return f"{'█' * filled}{'░' * empty} {percent:.0f}%"
 
