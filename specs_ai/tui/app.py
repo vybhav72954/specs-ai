@@ -39,11 +39,17 @@ class SpecsAIApp(App):
         Binding("question_mark", "toggle_help", "Help"),
     ]
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, model: str | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._specs: dict | None = None
         self._verbose = False
         self._help_visible = False
+        # Monotonic counter used to invalidate stale worker output when
+        # the user kicks off a new scan / re-query before the previous one
+        # has finished. Thread workers cannot be force-cancelled in Python,
+        # so we cooperatively drop UI updates whose token is out of date.
+        self._scan_token = 0
+        self._model = model
 
     def compose(self) -> ComposeResult:
         """Build the full dashboard layout."""
@@ -99,18 +105,61 @@ class SpecsAIApp(App):
 
     def _run_scan(self) -> None:
         """Run hardware collection in a background worker."""
-        log = self.query_one("#event-log", EventLog)
-        log.log_start("Hardware extraction started...")
-        self.run_worker(self._collect_and_display, thread=True)
+        self._scan_token += 1
+        token = self._scan_token
+        self._ui_log("start", "Hardware extraction started...")
+        # exclusive=True cancels any prior worker in this group; the token
+        # check below catches the case where Python can't actually kill the
+        # already-running thread.
+        self.run_worker(
+            lambda: self._collect_and_display(token),
+            thread=True,
+            exclusive=True,
+            group="scan",
+        )
 
-    def _collect_and_display(self) -> None:
+    def _is_current(self, token: int) -> bool:
+        """Return True if `token` matches the latest scan token."""
+        return token == self._scan_token
+
+    # ── Main-thread helpers (callable via call_from_thread) ──────────
+    # All DOM access lives here so worker threads never touch the
+    # widget tree directly.
+
+    def _ui_log(self, kind: str, msg: str) -> None:
+        """Main-thread: append a line to the event log."""
+        log = self.query_one("#event-log", EventLog)
+        {
+            "start": log.log_start,
+            "ok": log.log_ok,
+            "error": log.log_error,
+            "warn": log.log_warn,
+        }[kind](msg)
+
+    def _ui_ai_loading(self) -> None:
+        """Main-thread: switch the AI panel to its loading state."""
+        model_name = self._model or "gemini-2.5-flash"
+        self.query_one("#ai-panel", AIPanel).set_loading(model_name)
+
+    def _ui_ai_result(self, text: str) -> None:
+        """Main-thread: render an LLM result in the AI panel."""
+        self.query_one("#ai-panel", AIPanel).set_result(text)
+
+    def _ui_ai_error(self, msg: str) -> None:
+        """Main-thread: render an error in the AI panel."""
+        self.query_one("#ai-panel", AIPanel).set_error(msg)
+
+    def _ui_set_uptime(self, seconds: int) -> None:
+        """Main-thread: push a real uptime value into the header."""
+        self.query_one("#header", HeaderWidget).uptime_seconds = seconds
+
+    # ── Workers (thread=True; never touch widgets directly) ──────────
+
+    def _collect_and_display(self, token: int) -> None:
         """Background worker: collect specs and query LLM."""
         import pythoncom
 
         from specs_ai.extractor import collect
-
-        log = self.query_one("#event-log", EventLog)
-        ai = self.query_one("#ai-panel", AIPanel)
 
         # WMI uses COM, which must be initialized per-thread on Windows.
         pythoncom.CoInitialize()
@@ -118,38 +167,51 @@ class SpecsAIApp(App):
             # ── Phase 1: Collect hardware specs ──
             try:
                 specs = collect()
+                if not self._is_current(token):
+                    return
                 self._specs = dataclasses.asdict(specs)
-                self.call_from_thread(log.log_ok, "Hardware specs collected")
+                self.call_from_thread(self._ui_log, "ok", "Hardware specs collected")
             except Exception as e:
-                self.call_from_thread(log.log_error, f"Extraction failed: {e}")
+                if self._is_current(token):
+                    self.call_from_thread(self._ui_log, "error", f"Extraction failed: {e}")
                 return
         finally:
             pythoncom.CoUninitialize()
 
         # ── Phase 2: Populate panels ──
+        if not self._is_current(token):
+            return
         self.call_from_thread(self._populate_panels)
 
         # ── Phase 3: Set uptime on header ──
         uptime = self._specs.get("system", {}).get("uptime_seconds", 0)
-        if isinstance(uptime, int):
-            header = self.query_one("#header", HeaderWidget)
-            self.call_from_thread(setattr, header, "uptime_seconds", uptime)
+        if isinstance(uptime, int) and self._is_current(token):
+            self.call_from_thread(self._ui_set_uptime, uptime)
 
         # ── Phase 4: Query LLM ──
-        self.call_from_thread(ai.set_loading)
-        self.call_from_thread(log.log_start, "Querying Gemini API...")
+        if not self._is_current(token):
+            return
+        self.call_from_thread(self._ui_ai_loading)
+        self.call_from_thread(self._ui_log, "start", "Querying Gemini API...")
 
         try:
             from specs_ai.llm_agent import get_recommendations
-            result = get_recommendations(self._specs, verbose=self._verbose)
-            self.call_from_thread(ai.set_result, result)
-            self.call_from_thread(log.log_ok, "Recommendations received")
+            kwargs = {"verbose": self._verbose}
+            if self._model:
+                kwargs["model"] = self._model
+            result = get_recommendations(self._specs, **kwargs)
+            if not self._is_current(token):
+                return
+            self.call_from_thread(self._ui_ai_result, result)
+            self.call_from_thread(self._ui_log, "ok", "Recommendations received")
         except EnvironmentError as e:
-            self.call_from_thread(ai.set_error, str(e))
-            self.call_from_thread(log.log_error, f"API key error: {e}")
+            if self._is_current(token):
+                self.call_from_thread(self._ui_ai_error, str(e))
+                self.call_from_thread(self._ui_log, "error", f"API key error: {e}")
         except RuntimeError as e:
-            self.call_from_thread(ai.set_error, str(e))
-            self.call_from_thread(log.log_error, f"API error: {e}")
+            if self._is_current(token):
+                self.call_from_thread(self._ui_ai_error, str(e))
+                self.call_from_thread(self._ui_log, "error", f"API error: {e}")
 
     def _populate_panels(self) -> None:
         """Push collected data into all hardware panels."""
@@ -185,49 +247,55 @@ class SpecsAIApp(App):
 
     def action_rescan(self) -> None:
         """Re-scan hardware and re-query the LLM."""
-        log = self.query_one("#event-log", EventLog)
-        log.log_start("Re-scanning hardware...")
+        self._ui_log("start", "Re-scanning hardware...")
         self._run_scan()
 
     def action_toggle_explain(self) -> None:
         """Toggle between compact and verbose LLM output."""
         self._verbose = not self._verbose
-        log = self.query_one("#event-log", EventLog)
         mode = "detailed" if self._verbose else "compact"
-        log.log_start(f"Switched to {mode} mode, re-querying...")
+        self._ui_log("start", f"Switched to {mode} mode, re-querying...")
 
         if self._specs:
-            ai = self.query_one("#ai-panel", AIPanel)
-            ai.set_loading()
-            self.run_worker(self._requery_llm, thread=True)
+            self._scan_token += 1
+            token = self._scan_token
+            self._ui_ai_loading()
+            self.run_worker(
+                lambda: self._requery_llm(token),
+                thread=True,
+                exclusive=True,
+                group="scan",
+            )
 
-    def _requery_llm(self) -> None:
+    def _requery_llm(self, token: int) -> None:
         """Background worker: re-query LLM with current specs."""
-        ai = self.query_one("#ai-panel", AIPanel)
-        log = self.query_one("#event-log", EventLog)
-
         try:
             from specs_ai.llm_agent import get_recommendations
-            result = get_recommendations(self._specs, verbose=self._verbose)
-            self.call_from_thread(ai.set_result, result)
-            self.call_from_thread(log.log_ok, "Recommendations updated")
+            kwargs = {"verbose": self._verbose}
+            if self._model:
+                kwargs["model"] = self._model
+            result = get_recommendations(self._specs, **kwargs)
+            if not self._is_current(token):
+                return
+            self.call_from_thread(self._ui_ai_result, result)
+            self.call_from_thread(self._ui_log, "ok", "Recommendations updated")
         except Exception as e:
-            self.call_from_thread(ai.set_error, str(e))
-            self.call_from_thread(log.log_error, f"Re-query failed: {e}")
+            if self._is_current(token):
+                self.call_from_thread(self._ui_ai_error, str(e))
+                self.call_from_thread(self._ui_log, "error", f"Re-query failed: {e}")
 
     def action_export(self) -> None:
         """Export specs to specs_report.json in the current directory."""
-        log = self.query_one("#event-log", EventLog)
         if not self._specs:
-            log.log_warn("No specs available to export")
+            self._ui_log("warn", "No specs available to export")
             return
 
         path = Path.cwd() / "specs_report.json"
         try:
             path.write_text(json.dumps(self._specs, indent=2, default=str))
-            log.log_ok(f"Specs exported to {path.name}")
+            self._ui_log("ok", f"Specs exported to {path.name}")
         except Exception as e:
-            log.log_error(f"Export failed: {e}")
+            self._ui_log("error", f"Export failed: {e}")
 
     def action_toggle_help(self) -> None:
         """Show or hide the help overlay."""
