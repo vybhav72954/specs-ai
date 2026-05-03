@@ -108,16 +108,20 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
             cap_str = ""
         battery_line = f"\nBattery:     {bat_name}  (Health: {health_str}{cap_str})"
         listed_components = "(CPU, RAM, GPU, Motherboard, Storage, WiFi, Battery)"
-        battery_note = (
+        battery_note_verbose = (
             "NOTE: If recommending a battery replacement for a laptop, always warn the user "
             "that sourcing genuine OEM replacement batteries can be difficult as original parts "
             "are often not readily available; advise using a certified service centre or a "
             "carefully vetted third-party supplier.\n\n"
         )
+        battery_note_compact = (
+            "NOTE: If recommending a battery replacement, mention that OEM parts may be scarce.\n\n"
+        )
     else:
         battery_line = "\nNote:        Desktop - PSU and battery info not available via WMI."
         listed_components = "(CPU, RAM, GPU, Motherboard, Storage, WiFi)"
-        battery_note = "\n"
+        battery_note_verbose = "\n"
+        battery_note_compact = "\n"
 
     os_name = system.get("os_name", "Unknown")
     os_build = system.get("os_build", "Unknown")
@@ -202,7 +206,7 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
             "(e.g. PSU, cooling, peripherals).\n"
             f"{hardware_note}"
             f"{uptime_note}"
-            f"{battery_note}"
+            f"{battery_note_compact}"
             "After the table, add exactly this line:\n"
             "Run `specs-ai --explain` for detailed part recommendations and impact analysis."
         )
@@ -223,7 +227,7 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
         "If you have no meaningful upgrade recommendation for a listed component, skip it.\n"
         f"{hardware_note}"
         f"{uptime_note}"
-        f"{battery_note}"
+        f"{battery_note_verbose}"
         "What are the best upgrade paths for the components listed above?"
     )
 

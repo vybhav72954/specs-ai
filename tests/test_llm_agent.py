@@ -264,9 +264,16 @@ def test_build_prompt_battery_in_listed_components() -> None:
     assert "CPU, RAM, GPU, Motherboard, Storage, WiFi, Battery" in prompt
 
 
-def test_build_prompt_battery_replacement_callout() -> None:
-    """Prompt must warn about difficulty sourcing genuine OEM battery replacements."""
+def test_build_prompt_battery_callout_compact_is_short() -> None:
+    """Compact prompt must include a short OEM scarcity note, not the full callout."""
     prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "OEM parts may be scarce" in prompt
+    assert "original parts" not in prompt
+
+
+def test_build_prompt_battery_callout_verbose_is_detailed() -> None:
+    """Verbose prompt must include the full OEM sourcing warning."""
+    prompt = _build_prompt(_SAMPLE_SPECS, verbose=True)
     assert "original parts" in prompt
 
 
@@ -284,7 +291,7 @@ def test_build_prompt_laptop_partial_battery_data() -> None:
     assert "ASUS Battery" in prompt
     assert "Health: Unknown" in prompt
     assert "mWh" not in prompt  # capacity tail must be absent
-    assert "original parts" in prompt  # OEM callout still applies on laptops
+    assert "OEM parts may be scarce" in prompt  # compact OEM callout still applies on laptops
 
 
 def test_build_prompt_contains_os_name() -> None:
