@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import psutil
 from textual.app import ComposeResult
-from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -23,8 +22,6 @@ class RAMPanel(Widget):
     }
     """
 
-    ram_percent: reactive[float] = reactive(0.0, init=False)
-
     def compose(self) -> ComposeResult:
         """Build the RAM info display."""
         yield Static("[b cyan]▦ RAM[/]")
@@ -38,16 +35,19 @@ class RAMPanel(Widget):
         self._poll_ram()
 
     def _poll_ram(self) -> None:
-        """Sample current RAM usage."""
-        mem = psutil.virtual_memory()
-        self.ram_percent = mem.percent
+        """Sample current RAM usage and update the bar in one snapshot.
 
-    def watch_ram_percent(self, value: float) -> None:
-        """React to RAM usage changes — update the bar."""
-        bar = usage_bar(value)
-        color = usage_color_class(value)
-        used_gb = psutil.virtual_memory().used / (1024 ** 3)
-        total_gb = psutil.virtual_memory().total / (1024 ** 3)
+        Reading psutil.virtual_memory() once and using all three fields from
+        the same sample keeps the displayed percentage and the GB readout
+        consistent — re-reading per field would let them drift apart.
+        """
+        mem = psutil.virtual_memory()
+        percent = mem.percent
+        used_gb = mem.used / (1024 ** 3)
+        total_gb = mem.total / (1024 ** 3)
+
+        bar = usage_bar(percent)
+        color = usage_color_class(percent)
         try:
             label = self.query_one("#ram-usage-bar", Static)
             label.update(f"  {bar}\n  {used_gb:.1f} / {total_gb:.1f} GB used")
