@@ -181,6 +181,10 @@ def test_system_fields() -> None:
     assert isinstance(system.os_build, str) and system.os_build != ""
     assert isinstance(system.os_install_date, str) and system.os_install_date != ""
     assert isinstance(system.system_type, str) and system.system_type != ""
+    assert isinstance(system.boot_timestamp, (float, str))
+    assert isinstance(system.uptime_seconds, (int, str))
+    if isinstance(system.uptime_seconds, int):
+        assert system.uptime_seconds >= 0
 
 
 def test_power_fields() -> None:

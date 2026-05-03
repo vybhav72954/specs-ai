@@ -3,9 +3,10 @@
 import argparse
 import dataclasses
 import sys
+from datetime import datetime
 
 from specs_ai import __version__
-from specs_ai.extractor import HardwareSpecs, collect
+from specs_ai.extractor import HardwareSpecs, _format_uptime, collect
 from specs_ai.llm_agent import DEFAULT_MODEL, get_recommendations
 
 
@@ -32,6 +33,12 @@ def _print_specs(specs: HardwareSpecs) -> None:
     print("-" * 44)
     print(f"OS:          {s.os_name}  (build {s.os_build})")
     print(f"System:      {s.system_type}  |  OS installed: {s.os_install_date}")
+    if isinstance(s.uptime_seconds, int):
+        uptime_str = _format_uptime(s.uptime_seconds)
+        if isinstance(s.boot_timestamp, float):
+            boot_dt = datetime.fromtimestamp(s.boot_timestamp).strftime("%Y-%m-%d %H:%M")
+            uptime_str += f"  (since {boot_dt})"
+        print(f"Uptime:      {uptime_str}")
     print("-" * 44)
     print(f"CPU:         {cpu.name}")
     print(f"             {_fmt(cpu.physical_cores)}c / {_fmt(cpu.logical_cores)}t"

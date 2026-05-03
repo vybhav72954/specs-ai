@@ -44,6 +44,8 @@ _SAMPLE_SPECS: dict = {
         "os_build": "26200",
         "os_install_date": "2023-05-14",
         "system_type": "Laptop",
+        "boot_timestamp": 1714500000.0,
+        "uptime_seconds": 86400,
     },
 }
 
@@ -327,6 +329,47 @@ def test_build_prompt_desktop_shows_psu_callout() -> None:
     assert "PSU" in prompt
     assert "Battery" not in prompt
     assert "original parts" not in prompt  # OEM callout must also be absent
+
+
+def test_build_prompt_contains_uptime() -> None:
+    """Prompt must include the uptime value."""
+    prompt = _build_prompt(_SAMPLE_SPECS)
+    assert "Uptime:" in prompt
+    assert "1d 0h" in prompt
+
+
+def test_build_prompt_no_uptime_advisory_under_5_days() -> None:
+    """Uptime under 5 days must not trigger a reboot advisory."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["system"] = dict(_SAMPLE_SPECS["system"], uptime_seconds=4 * 86400)
+    prompt = _build_prompt(specs)
+    assert "reboot" not in prompt.lower()
+
+
+def test_build_prompt_uptime_advisory_5_to_15_days() -> None:
+    """Uptime 5-15 days must trigger a moderate reboot advisory."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["system"] = dict(_SAMPLE_SPECS["system"], uptime_seconds=10 * 86400)
+    prompt = _build_prompt(specs)
+    assert "exceeds 5 days" in prompt
+    assert "reboot periodically" in prompt
+
+
+def test_build_prompt_uptime_advisory_over_15_days() -> None:
+    """Uptime over 15 days must trigger a strong reboot advisory."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["system"] = dict(_SAMPLE_SPECS["system"], uptime_seconds=20 * 86400)
+    prompt = _build_prompt(specs)
+    assert "exceeds 15 days" in prompt
+    assert "Strongly recommend" in prompt
+
+
+def test_build_prompt_unknown_uptime_no_advisory() -> None:
+    """Unknown uptime must not trigger any reboot advisory."""
+    specs = dict(_SAMPLE_SPECS)
+    specs["system"] = dict(_SAMPLE_SPECS["system"], uptime_seconds="Unknown")
+    prompt = _build_prompt(specs)
+    assert "reboot" not in prompt.lower()
 
 
 # ---- _format_value ----------------------------------------------------------

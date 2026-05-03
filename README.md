@@ -72,3 +72,8 @@ Or equivalently via the module entry point:
 python -m specs_ai
 python -m specs_ai --explain
 ```
+
+For testing, use the following commands:
+```bash
+uv run pytest tests/ -v 
+```

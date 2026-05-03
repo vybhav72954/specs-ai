@@ -123,11 +123,38 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
     os_build = system.get("os_build", "Unknown")
     os_install_date = system.get("os_install_date", "Unknown")
     system_type = system.get("system_type", "Unknown")
+    uptime_seconds = system.get("uptime_seconds", "Unknown")
+
+    if isinstance(uptime_seconds, int):
+        days = uptime_seconds // 86400
+        hours = (uptime_seconds % 86400) // 3600
+        uptime_str = f"{days}d {hours}h"
+    else:
+        uptime_str = "Unknown"
+
     system_line = (
         f"OS:          {os_name} (build {os_build})\n"
         f"System:      {system_type}  |  OS installed: {os_install_date}"
-        " (install date, not necessarily purchase date)"
+        " (install date, not necessarily purchase date)\n"
+        f"Uptime:      {uptime_str}"
     )
+
+    # Uptime advisory — thresholds: < 5d normal, 5-15d suggest reboot, > 15d strongly recommend.
+    if isinstance(uptime_seconds, int) and uptime_seconds >= 5 * 86400:
+        if uptime_seconds >= 15 * 86400:
+            uptime_note = (
+                "NOTE: System uptime exceeds 15 days. Strongly recommend the user reboot "
+                "to apply pending OS and driver updates, flush accumulated memory leaks, "
+                "and restore system stability. This should be flagged as a high-priority "
+                "recommendation.\n"
+            )
+        else:
+            uptime_note = (
+                "NOTE: System uptime exceeds 5 days. Advise the user to reboot periodically "
+                "to apply pending OS and driver updates and maintain system stability.\n"
+            )
+    else:
+        uptime_note = ""
 
     specs_block = (
         f"{system_line}\n"
@@ -174,6 +201,7 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
             "Do NOT mention, assume, or speculate about components that are not listed "
             "(e.g. PSU, cooling, peripherals).\n"
             f"{hardware_note}"
+            f"{uptime_note}"
             f"{battery_note}"
             "After the table, add exactly this line:\n"
             "Run `specs-ai --explain` for detailed part recommendations and impact analysis."
@@ -194,6 +222,7 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
         "(e.g. PSU, cooling, peripherals). "
         "If you have no meaningful upgrade recommendation for a listed component, skip it.\n"
         f"{hardware_note}"
+        f"{uptime_note}"
         f"{battery_note}"
         "What are the best upgrade paths for the components listed above?"
     )

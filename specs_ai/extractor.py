@@ -1,6 +1,7 @@
 """Hardware spec extraction using WMI and psutil."""
 
 import struct
+import time
 import winreg
 from dataclasses import dataclass
 
@@ -151,6 +152,8 @@ class SystemInfo:
     os_build: str         # e.g. "26200"
     os_install_date: str  # "YYYY-MM-DD" from Win32_OperatingSystem.InstallDate; proxy for purchase
     system_type: str      # "Laptop", "Desktop", "Workstation", or "Unknown"
+    boot_timestamp: float | str   # epoch seconds from psutil.boot_time(); "Unknown" on failure
+    uptime_seconds: int | str     # time.time() - boot_timestamp; "Unknown" on failure
 
 
 @dataclass
@@ -588,18 +591,35 @@ def _parse_wmi_date(wmi_date: str | None) -> str:
         return "Unknown"
 
 
+def _format_uptime(seconds: int) -> str:
+    """Convert an uptime duration in seconds to a human-readable 'Xd Yh Zm' string."""
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, _ = divmod(remainder, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}d")
+    if hours or days:  # show hours whenever there are days, even if 0h
+        parts.append(f"{hours}h")
+    parts.append(f"{minutes}m")
+    return " ".join(parts)
+
+
 def _get_system_info() -> SystemInfo:
-    """Extract OS name, version, build, install date, and PC form factor via WMI.
+    """Extract OS name, version, build, install date, PC form factor, and uptime.
 
     OS info comes from Win32_OperatingSystem; form factor from
     Win32_ComputerSystem.PCSystemType. The install date is the best available
     proxy for the machine's age — it resets on OS reinstalls, not on purchase.
+    Uptime is derived from psutil.boot_time().
     """
     os_name: str = "Unknown"
     os_version: str = "Unknown"
     os_build: str = "Unknown"
     os_install_date: str = "Unknown"
     system_type: str = "Unknown"
+    boot_ts: float | str = "Unknown"
+    uptime_sec: int | str = "Unknown"
 
     try:
         os_obj = wmi.WMI().Win32_OperatingSystem()[0]
@@ -618,12 +638,20 @@ def _get_system_info() -> SystemInfo:
     except Exception:
         pass
 
+    try:
+        boot_ts = psutil.boot_time()
+        uptime_sec = int(time.time() - boot_ts)
+    except Exception:
+        pass
+
     return SystemInfo(
         os_name=os_name,
         os_version=os_version,
         os_build=os_build,
         os_install_date=os_install_date,
         system_type=system_type,
+        boot_timestamp=boot_ts,
+        uptime_seconds=uptime_sec,
     )
 
 
