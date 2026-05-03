@@ -1,0 +1,188 @@
+/* specs-ai TUI — Hacker-esque Dashboard Theme */
+/* Single source of truth for all colors, spacing, and layout. */
+
+/* ── Global ────────────────────────────────────────────────── */
+
+Screen {
+    background: #0A0A0A;
+    color: #00FF41;
+}
+
+/* ── Outer 3-column grid: rain | content | rain ───────────── */
+
+#outer-grid {
+    layout: horizontal;
+    height: 100%;
+    width: 100%;
+}
+
+#rain-left, #rain-right {
+    width: 3;
+    height: 100%;
+    background: #0A0A0A;
+    color: #00FF41;
+}
+
+#main-content {
+    width: 1fr;
+    height: 100%;
+    background: #0A0A0A;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+
+#header {
+    height: auto;
+    max-height: 10;
+    background: #0A0A0A;
+    color: #00FF41;
+    padding: 0 1;
+}
+
+#title-art {
+    color: #00FF41;
+    text-style: bold;
+    width: 100%;
+    content-align: center middle;
+}
+
+#subtitle-bar {
+    layout: horizontal;
+    height: 1;
+    width: 100%;
+    padding: 0 1;
+    color: #00802080;
+}
+
+.subtitle-item {
+    width: 1fr;
+    color: #00802080;
+}
+
+.subtitle-item-right {
+    width: 1fr;
+    text-align: right;
+    color: #00802080;
+}
+
+/* ── Panel Grid ───────────────────────────────────────────── */
+
+#panel-grid {
+    layout: grid;
+    grid-size: 3 3;
+    grid-gutter: 0 1;
+    height: 1fr;
+    padding: 0 1;
+}
+
+.hw-panel {
+    border: round #00802080;
+    background: #111111;
+    padding: 0 1;
+    height: 100%;
+    min-height: 5;
+}
+
+.hw-panel-title {
+    color: #00D4FF;
+    text-style: bold;
+}
+
+.hw-panel-value {
+    color: #00FF41;
+}
+
+.hw-panel-dim {
+    color: #555555;
+}
+
+/* ── Bottom panels (full-width) ───────────────────────────── */
+
+#bottom-section {
+    height: auto;
+    max-height: 16;
+    padding: 0 1;
+}
+
+#ai-panel {
+    border: round #00D4FF;
+    background: #111111;
+    padding: 0 1;
+    height: auto;
+    max-height: 9;
+    min-height: 4;
+}
+
+#ai-panel-title {
+    color: #00D4FF;
+    text-style: bold;
+}
+
+#event-log {
+    border: round #00802080;
+    background: #111111;
+    padding: 0 1;
+    height: 5;
+    min-height: 4;
+}
+
+/* ── Keybind Footer ───────────────────────────────────────── */
+
+#footer-bar {
+    dock: bottom;
+    height: 1;
+    background: #111111;
+    color: #00D4FF;
+    padding: 0 1;
+}
+
+.key-label {
+    color: #00D4FF;
+    text-style: bold;
+}
+
+.key-desc {
+    color: #555555;
+}
+
+/* ── Progress Bars ────────────────────────────────────────── */
+
+Bar {
+    color: #00FF41;
+    background: #333333;
+}
+
+/* ── Color states ─────────────────────────────────────────── */
+
+.status-green {
+    color: #00FF41;
+}
+
+.status-amber {
+    color: #FFB800;
+}
+
+.status-red {
+    color: #FF003C;
+}
+
+.status-dim {
+    color: #555555;
+}
+
+/* ── Help Overlay ─────────────────────────────────────────── */
+
+#help-overlay {
+    layer: overlay;
+    dock: bottom;
+    height: auto;
+    max-height: 12;
+    background: #111111;
+    border: round #00D4FF;
+    padding: 1 2;
+    display: none;
+}
+
+#help-overlay.visible {
+    display: block;
+}

@@ -50,7 +50,7 @@ A template is provided at `.env.example` — copy it to `.env` and fill in your 
 ## Usage
 
 ```
-specs-ai [--explain] [--specs-only] [--model MODEL]
+specs-ai [--explain] [--specs-only] [--tui] [--model MODEL]
 ```
 
 | Flag | Description |
@@ -58,6 +58,7 @@ specs-ai [--explain] [--specs-only] [--model MODEL]
 | *(none)* | Collect specs and show a compact summary table of upgrade options |
 | `--explain` | Full detailed recommendations — specific part models, impact-per-dollar |
 | `--specs-only` | Print hardware specs only; skip the LLM call entirely |
+| `--tui` | Launch the interactive hacker-esque TUI dashboard |
 | `--model MODEL` | Gemini model to use (default: `gemini-2.5-flash`) |
 
 **Quick start:**
@@ -68,6 +69,9 @@ specs-ai
 # Detailed recommendations
 specs-ai --explain
 
+# Interactive TUI dashboard
+specs-ai --tui
+
 # Just the hardware specs, no LLM
 specs-ai --specs-only
 ```
@@ -76,7 +80,27 @@ Or equivalently via the module entry point:
 ```powershell
 python -m specs_ai
 python -m specs_ai --explain
+python -m specs_ai --tui
 ```
+
+---
+
+## TUI Dashboard
+
+Launch with `specs-ai --tui` for a full-screen, hacker-themed hardware monitoring
+dashboard built with [Textual](https://textual.textualize.io/) and
+[Rich](https://rich.readthedocs.io/).
+
+**Features:**
+- Big blocky ANSI Shadow "SPECS-AI" title in neon green
+- Matrix-style digital rain animation on left/right gutters
+- Live CPU sparkline, RAM usage bar, and disk usage bars
+- Color-coded uptime (green < 5d, amber 5-15d, red > 15d)
+- AI upgrade recommendations panel (queries Gemini in background)
+- Scrolling event log with timestamped activity
+- Keybindings: `[Q]` Quit, `[R]` Re-scan, `[E]` Toggle explain, `[S]` Export, `[?]` Help
+
+---
 
 For development and testing (requires [uv](https://docs.astral.sh/uv/)):
 ```bash

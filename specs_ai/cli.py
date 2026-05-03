@@ -103,12 +103,23 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Show detailed upgrade recommendations with specific part suggestions (default is a summary table).",
     )
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch the interactive hacker-esque TUI dashboard.",
+    )
     return parser.parse_args(argv)
 
 
 def main() -> None:
     """Run the specs-ai CLI: collect specs, optionally query Gemini for recommendations."""
     args = _parse_args()
+
+    if args.tui:
+        from specs_ai.tui.app import SpecsAIApp
+        app = SpecsAIApp()
+        app.run()
+        return
 
     print("Collecting hardware specs...", flush=True)
     specs = collect()
