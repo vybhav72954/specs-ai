@@ -81,11 +81,11 @@ class SpecsAIApp(App):
 
                 # Footer keybinds
                 yield Static(
-                    " [b cyan][Q][/] Quit  "
-                    "[b cyan][R][/] Re-scan  "
-                    "[b cyan][E][/] Explain  "
-                    "[b cyan][S][/] Export  "
-                    "[b cyan][H][/] Help",
+                    " [b cyan][Q][/] (Q)uit  "
+                    "[b cyan][R][/] (R)e-scan  "
+                    "[b cyan][E][/] (E)xplain  "
+                    "[b cyan][S][/] (E)xport  "
+                    "[b cyan][H][/] (H)elp",
                     id="footer-bar",
                 )
 
