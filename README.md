@@ -6,7 +6,7 @@ recommendations — knowing exactly what you have.
 
 **Collected specs:** CPU (model, cores, clock, socket), RAM (capacity, type, speed,
 slots), GPU (model, VRAM, Integrated/Dedicated), Motherboard, Storage (all drives,
-NVMe/SATA/HDD), WiFi adapter, Battery health (laptops), OS metadata.
+NVMe/SATA/HDD), WiFi adapter, Battery health (laptops), System uptime, OS metadata.
 
 The CPU socket lets the LLM know whether the CPU is soldered (BGA — cannot upgrade)
 or swappable (LGA/AM4/etc.). GPU type tells it whether the graphics are integrated
@@ -20,6 +20,11 @@ Currently Windows-only.
 
 ```
 pip install specs-ai
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+```
+uv pip install specs-ai
 ```
 
 ---
@@ -73,7 +78,7 @@ python -m specs_ai
 python -m specs_ai --explain
 ```
 
-For testing, use the following commands:
+For development and testing (requires [uv](https://docs.astral.sh/uv/)):
 ```bash
-uv run pytest tests/ -v 
+uv run pytest tests/ -v
 ```
