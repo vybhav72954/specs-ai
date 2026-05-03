@@ -54,7 +54,13 @@ class CPUPanel(Widget):
         yield Static("", id="cpu-sparkline")
 
     def on_mount(self) -> None:
-        """Start CPU usage polling."""
+        """Start CPU usage polling.
+
+        psutil.cpu_percent(interval=0) returns 0.0 on the very first call
+        because there's no prior sample to diff against. We prime it once
+        here so the first real poll already has a baseline.
+        """
+        psutil.cpu_percent(interval=0)
         self.set_interval(CPU_POLL_INTERVAL, self._poll_cpu)
 
     def _poll_cpu(self) -> None:

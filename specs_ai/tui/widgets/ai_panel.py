@@ -22,10 +22,10 @@ class AIPanel(Widget):
         yield Static("[b cyan]🤖 AI UPGRADE RECOMMENDATIONS[/]", id="ai-panel-title")
         yield Static(self._content, id="ai-content")
 
-    def set_loading(self) -> None:
-        """Show the loading state."""
+    def set_loading(self, model_name: str = "gemini-2.5-flash") -> None:
+        """Show the loading state, naming the model actually being queried."""
         self._loading = True
-        self._content = "[yellow]▌ Querying Gemini 2.5 Flash...  ████░░░░░░░░[/]"
+        self._content = f"[yellow]▌ Querying {model_name}...  ████░░░░░░░░[/]"
         try:
             self.query_one("#ai-content", Static).update(self._content)
         except Exception:
