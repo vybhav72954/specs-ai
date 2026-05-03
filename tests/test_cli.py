@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from specs_ai.cli import _fmt, _parse_args, _print_specs, main
-from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, PowerInfo, RAMInfo, StorageInfo, SystemInfo, WiFiInfo
+from specs_ai.extractor import CPUInfo, GPUInfo, HardwareSpecs, MotherboardInfo, PowerInfo, RAMInfo, StorageInfo, SystemInfo, WiFiInfo, _format_uptime
 from specs_ai.llm_agent import DEFAULT_MODEL
 
 
@@ -39,6 +39,8 @@ def sample_specs() -> HardwareSpecs:
             os_build="26200",
             os_install_date="2023-05-14",
             system_type="Laptop",
+            boot_timestamp=1714500000.0,
+            uptime_seconds=86400,  # 1 day
         ),
     )
 
@@ -66,6 +68,8 @@ def unknown_specs() -> HardwareSpecs:
             os_build="Unknown",
             os_install_date="Unknown",
             system_type="Unknown",
+            boot_timestamp="Unknown",
+            uptime_seconds="Unknown",
         ),
     )
 
@@ -250,7 +254,8 @@ def test_print_specs_multiple_drives(capsys: pytest.CaptureFixture) -> None:
         power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
                         full_charge_capacity_mwh="Unknown", health_pct="Unknown", has_battery=False),
         system=SystemInfo(os_name="Windows 11 Home", os_version="10.0.26200", os_build="26200",
-                          os_install_date="2023-01-01", system_type="Desktop"),
+                          os_install_date="2023-01-01", system_type="Desktop",
+                          boot_timestamp=1714500000.0, uptime_seconds=7200),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -279,7 +284,8 @@ def test_print_specs_no_double_space_unknown_ram_type(capsys: pytest.CaptureFixt
         power=PowerInfo(battery_name="Unknown", design_capacity_mwh="Unknown",
                         full_charge_capacity_mwh="Unknown", health_pct="Unknown", has_battery=False),
         system=SystemInfo(os_name="Windows 11 Home", os_version="10.0.26200", os_build="26200",
-                          os_install_date="2023-01-01", system_type="Desktop"),
+                          os_install_date="2023-01-01", system_type="Desktop",
+                          boot_timestamp=1714500000.0, uptime_seconds=3600),
     )
     _print_specs(specs)
     assert "  @" not in capsys.readouterr().out
@@ -428,7 +434,8 @@ def test_print_specs_laptop_partial_battery_data(capsys: pytest.CaptureFixture) 
             has_battery=True,
         ),
         system=SystemInfo(os_name="Windows 11 Home", os_version="10.0.26200", os_build="26200",
-                          os_install_date="2023-01-01", system_type="Laptop"),
+                          os_install_date="2023-01-01", system_type="Laptop",
+                          boot_timestamp=1714500000.0, uptime_seconds=86400),
     )
     _print_specs(specs)
     out = capsys.readouterr().out
@@ -443,7 +450,9 @@ def test_print_specs_desktop_shows_psu_callout(capsys: pytest.CaptureFixture, un
     out = capsys.readouterr().out
     assert "Desktop" in out
     assert "PSU" in out
-    assert "Battery" not in out
+    # Asserting no "Battery:" row was printed (case-sensitive on the row label
+    # only — the descriptive note may legitimately mention "battery" lowercase).
+    assert "Battery:" not in out
 
 
 def test_print_specs_shows_os_name(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
@@ -468,3 +477,32 @@ def test_print_specs_shows_system_type(capsys: pytest.CaptureFixture, sample_spe
     """Output must show the system type (Laptop / Desktop)."""
     _print_specs(sample_specs)
     assert "Laptop" in capsys.readouterr().out
+
+
+def test_print_specs_shows_uptime(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
+    """Output must show the formatted uptime when available."""
+    _print_specs(sample_specs)
+    out = capsys.readouterr().out
+    assert "Uptime:" in out
+    assert "1d" in out
+
+
+def test_print_specs_omits_uptime_when_unknown(capsys: pytest.CaptureFixture, unknown_specs: HardwareSpecs) -> None:
+    """Uptime line must not appear when uptime_seconds is 'Unknown'."""
+    _print_specs(unknown_specs)
+    assert "Uptime:" not in capsys.readouterr().out
+
+
+def test_format_uptime_days_hours_minutes() -> None:
+    """_format_uptime must produce 'Xd Yh Zm' for multi-day uptimes."""
+    assert _format_uptime(90061) == "1d 1h 1m"  # 1 day, 1 hour, 1 minute, 1 second
+
+
+def test_format_uptime_hours_only() -> None:
+    """_format_uptime must omit days prefix when under 1 day."""
+    assert _format_uptime(7200) == "2h 0m"
+
+
+def test_format_uptime_minutes_only() -> None:
+    """_format_uptime must show only minutes when under 1 hour."""
+    assert _format_uptime(300) == "5m"

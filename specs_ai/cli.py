@@ -3,9 +3,10 @@
 import argparse
 import dataclasses
 import sys
+from datetime import datetime
 
 from specs_ai import __version__
-from specs_ai.extractor import HardwareSpecs, collect
+from specs_ai.extractor import HardwareSpecs, _format_uptime, collect
 from specs_ai.llm_agent import DEFAULT_MODEL, get_recommendations
 
 
@@ -32,6 +33,12 @@ def _print_specs(specs: HardwareSpecs) -> None:
     print("-" * 44)
     print(f"OS:          {s.os_name}  (build {s.os_build})")
     print(f"System:      {s.system_type}  |  OS installed: {s.os_install_date}")
+    if isinstance(s.uptime_seconds, int):
+        uptime_str = _format_uptime(s.uptime_seconds)
+        if isinstance(s.boot_timestamp, float):
+            boot_dt = datetime.fromtimestamp(s.boot_timestamp).strftime("%Y-%m-%d %H:%M")
+            uptime_str += f"  (since {boot_dt})"
+        print(f"Uptime:      {uptime_str}")
     print("-" * 44)
     print(f"CPU:         {cpu.name}")
     print(f"             {_fmt(cpu.physical_cores)}c / {_fmt(cpu.logical_cores)}t"
@@ -96,12 +103,26 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Show detailed upgrade recommendations with specific part suggestions (default is a summary table).",
     )
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch the interactive hacker-esque TUI dashboard.",
+    )
     return parser.parse_args(argv)
 
 
 def main() -> None:
     """Run the specs-ai CLI: collect specs, optionally query Gemini for recommendations."""
     args = _parse_args()
+
+    if args.tui:
+        from specs_ai.tui.app import SpecsAIApp
+        # Forward --model so `specs-ai --tui --model gemini-2.0-flash` is honoured
+        # (None means SpecsAIApp uses get_recommendations' default).
+        chosen = args.model if args.model != DEFAULT_MODEL else None
+        app = SpecsAIApp(model=chosen)
+        app.run()
+        return
 
     print("Collecting hardware specs...", flush=True)
     specs = collect()

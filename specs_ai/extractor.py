@@ -1,6 +1,7 @@
 """Hardware spec extraction using WMI and psutil."""
 
 import struct
+import time
 import winreg
 from dataclasses import dataclass
 
@@ -151,6 +152,8 @@ class SystemInfo:
     os_build: str         # e.g. "26200"
     os_install_date: str  # "YYYY-MM-DD" from Win32_OperatingSystem.InstallDate; proxy for purchase
     system_type: str      # "Laptop", "Desktop", "Workstation", or "Unknown"
+    boot_timestamp: float | str   # epoch seconds from psutil.boot_time(); "Unknown" on failure
+    uptime_seconds: int | str     # time.time() - boot_timestamp; "Unknown" on failure
 
 
 @dataclass
@@ -281,7 +284,16 @@ def _get_ram() -> RAMInfo:
 
         types = [int(s.SMBIOSMemoryType) for s in sticks if s.SMBIOSMemoryType]
         if types:
-            ram_type = _MEMORY_TYPE_MAP.get(types[0], "Unknown")
+            mapped = [_MEMORY_TYPE_MAP.get(t, "Unknown") for t in types]
+            distinct = {m for m in mapped if m != "Unknown"}
+            if len(distinct) == 1:
+                ram_type = distinct.pop()
+            elif len(distinct) > 1:
+                # Mixed-generation sticks (rare but possible). Surface the
+                # mismatch rather than silently picking one — the LLM should
+                # know the system is running on heterogeneous RAM.
+                ram_type = "Mixed (" + "/".join(sorted(distinct)) + ")"
+            # else: all "Unknown" → leave ram_type as "Unknown"
     except Exception:
         pass
 
@@ -405,28 +417,39 @@ def _get_motherboard() -> MotherboardInfo:
     (e.g. "FX505DT-BI7N10") that BaseBoard.Product truncates. Falls back to
     Win32_ComputerSystem.Model if ComputerSystemProduct returns nothing useful.
     All strings are filtered through _clean_board_string to discard placeholders.
+
+    Reuses a single WMI connection — each wmi.WMI() call opens a fresh COM
+    pipe, which is noticeably slow on Windows.
     """
     manufacturer: str = "Unknown"
     model: str = "Unknown"
     system_model: str = "Unknown"
 
     try:
-        board = wmi.WMI().Win32_BaseBoard()[0]
-        manufacturer = _clean_board_string(board.Manufacturer)
-        model = _clean_board_string(board.Product)
+        c = wmi.WMI()
+    except Exception:
+        return MotherboardInfo(manufacturer=manufacturer, model=model, system_model=system_model)
+
+    try:
+        boards = c.Win32_BaseBoard()
+        if boards:
+            manufacturer = _clean_board_string(boards[0].Manufacturer)
+            model = _clean_board_string(boards[0].Product)
     except Exception:
         pass
 
     try:
-        csp = wmi.WMI().Win32_ComputerSystemProduct()[0]
-        system_model = _clean_board_string(csp.Name)
+        csp = c.Win32_ComputerSystemProduct()
+        if csp:
+            system_model = _clean_board_string(csp[0].Name)
     except Exception:
         pass
 
     if system_model == "Unknown":
         try:
-            cs = wmi.WMI().Win32_ComputerSystem()[0]
-            system_model = _clean_board_string(cs.Model)
+            cs = c.Win32_ComputerSystem()
+            if cs:
+                system_model = _clean_board_string(cs[0].Model)
         except Exception:
             pass
 
@@ -578,28 +601,47 @@ def _get_power() -> PowerInfo:
 def _parse_wmi_date(wmi_date: str | None) -> str:
     """Parse a WMI DMTF datetime string (YYYYMMDDHHMMSS.mmmmmm+UUU) to YYYY-MM-DD.
 
-    Returns 'Unknown' when the input is absent or malformed.
+    Returns 'Unknown' when the input is absent, too short, or contains
+    non-digit characters in the date prefix (some buggy BIOSes return
+    placeholder text rather than a real timestamp).
     """
     if not wmi_date or len(wmi_date) < 8:
         return "Unknown"
-    try:
-        return f"{wmi_date[:4]}-{wmi_date[4:6]}-{wmi_date[6:8]}"
-    except Exception:
+    prefix = wmi_date[:8]
+    if not prefix.isdigit():
         return "Unknown"
+    return f"{prefix[:4]}-{prefix[4:6]}-{prefix[6:8]}"
+
+
+def _format_uptime(seconds: int) -> str:
+    """Convert an uptime duration in seconds to a human-readable 'Xd Yh Zm' string."""
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, _ = divmod(remainder, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}d")
+    if hours or days:  # show hours whenever there are days, even if 0h
+        parts.append(f"{hours}h")
+    parts.append(f"{minutes}m")
+    return " ".join(parts)
 
 
 def _get_system_info() -> SystemInfo:
-    """Extract OS name, version, build, install date, and PC form factor via WMI.
+    """Extract OS name, version, build, install date, PC form factor, and uptime.
 
     OS info comes from Win32_OperatingSystem; form factor from
     Win32_ComputerSystem.PCSystemType. The install date is the best available
     proxy for the machine's age — it resets on OS reinstalls, not on purchase.
+    Uptime is derived from psutil.boot_time().
     """
     os_name: str = "Unknown"
     os_version: str = "Unknown"
     os_build: str = "Unknown"
     os_install_date: str = "Unknown"
     system_type: str = "Unknown"
+    boot_ts: float | str = "Unknown"
+    uptime_sec: int | str = "Unknown"
 
     try:
         os_obj = wmi.WMI().Win32_OperatingSystem()[0]
@@ -618,12 +660,20 @@ def _get_system_info() -> SystemInfo:
     except Exception:
         pass
 
+    try:
+        boot_ts = psutil.boot_time()
+        uptime_sec = int(time.time() - boot_ts)
+    except Exception:
+        pass
+
     return SystemInfo(
         os_name=os_name,
         os_version=os_version,
         os_build=os_build,
         os_install_date=os_install_date,
         system_type=system_type,
+        boot_timestamp=boot_ts,
+        uptime_seconds=uptime_sec,
     )
 
 
