@@ -31,12 +31,15 @@ class SpecsAIApp(App):
     TITLE = "SPECS-AI"
     CSS_PATH = "styles.tcss"
 
+    # priority=True so these fire even when a focusable child widget
+    # (e.g. RichLog in the event log) currently has focus and would
+    # otherwise consume the keystroke for its own scrolling/navigation.
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
-        Binding("r", "rescan", "Re-scan"),
-        Binding("e", "toggle_explain", "Explain"),
-        Binding("s", "export", "Export"),
-        Binding("question_mark", "toggle_help", "Help"),
+        Binding("q", "quit", "Quit", priority=True),
+        Binding("r", "rescan", "Re-scan", priority=True),
+        Binding("e", "toggle_explain", "Explain", priority=True),
+        Binding("s", "export", "Export", priority=True),
+        Binding("h", "toggle_help", "Help", priority=True),
     ]
 
     def __init__(self, model: str | None = None, **kwargs) -> None:
@@ -82,7 +85,7 @@ class SpecsAIApp(App):
                     "[b cyan][R][/] Re-scan  "
                     "[b cyan][E][/] Explain  "
                     "[b cyan][S][/] Export  "
-                    "[b cyan][?][/] Help",
+                    "[b cyan][H][/] Help",
                     id="footer-bar",
                 )
 
@@ -93,7 +96,7 @@ class SpecsAIApp(App):
                     "  [b]R[/] — Re-scan hardware and re-query the LLM\n"
                     "  [b]E[/] — Toggle compact table / detailed --explain mode\n"
                     "  [b]S[/] — Export full specs to specs_report.json\n"
-                    "  [b]?[/] — Toggle this help overlay",
+                    "  [b]H[/] — Toggle this help overlay",
                     id="help-overlay",
                 )
 
@@ -297,11 +300,21 @@ class SpecsAIApp(App):
         except Exception as e:
             self._ui_log("error", f"Export failed: {e}")
 
+    def on_ready(self) -> None:
+        """Hide the help overlay once layout is ready."""
+        # Setting display directly (rather than via a CSS .visible class)
+        # avoids cascade/specificity surprises with `display: none` rules.
+        try:
+            self.query_one("#help-overlay", Static).display = False
+        except Exception:
+            pass
+
     def action_toggle_help(self) -> None:
         """Show or hide the help overlay."""
-        overlay = self.query_one("#help-overlay", Static)
+        try:
+            overlay = self.query_one("#help-overlay", Static)
+        except Exception:
+            return
         self._help_visible = not self._help_visible
-        if self._help_visible:
-            overlay.add_class("visible")
-        else:
-            overlay.remove_class("visible")
+        overlay.display = self._help_visible
+        self._ui_log("start", f"Help {'shown' if self._help_visible else 'hidden'}")

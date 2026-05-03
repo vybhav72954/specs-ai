@@ -140,6 +140,8 @@ Screen {
 }
 
 /* ── Help Overlay ─────────────────────────────────────────── */
+/* Visibility is managed in Python via widget.display = True/False,  */
+/* so no display rules here (they would override the Python toggle). */
 
 #help-overlay {
     layer: overlay;
@@ -149,9 +151,4 @@ Screen {
     background: #111111;
     border: round #00D4FF;
     padding: 1 2;
-    display: none;
-}
-
-#help-overlay.visible {
-    display: block;
 }
