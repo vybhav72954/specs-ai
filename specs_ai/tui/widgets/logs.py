@@ -6,7 +6,7 @@ from datetime import datetime
 
 from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import Static
+from textual.widgets import RichLog, Static
 
 MAX_LOG_LINES = 100
 
@@ -18,29 +18,37 @@ ICON_WARN = "⚠"
 
 
 class EventLog(Widget):
-    """Scrollable, timestamped event log with icons."""
+    """Scrollable, timestamped event log with icons.
 
-    DEFAULT_CSS = """
-    EventLog { height: auto; min-height: 3; overflow-y: auto; }
+    Backed by Textual's RichLog so the full MAX_LOG_LINES buffer is
+    actually accessible — the user can scroll up to inspect older entries
+    rather than only seeing whatever fits in the panel's visible height.
     """
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._lines: list[str] = []
+    DEFAULT_CSS = """
+    EventLog { height: auto; min-height: 3; }
+    EventLog > RichLog { height: 1fr; background: #111111; }
+    """
 
     def compose(self) -> ComposeResult:
         """Build the event log display."""
         yield Static("[b cyan]📋 EVENT LOG[/]", id="log-title")
-        yield Static("", id="log-content")
+        yield RichLog(
+            id="log-content",
+            max_lines=MAX_LOG_LINES,
+            markup=True,
+            auto_scroll=True,
+            wrap=False,
+        )
 
     def log(self, message: str, icon: str = ICON_START) -> None:
         """Add a timestamped line to the log."""
         ts = datetime.now().strftime("%H:%M:%S")
-        line = f"  [{ts}] {icon} {message}"
-        self._lines.append(line)
-        if len(self._lines) > MAX_LOG_LINES:
-            self._lines = self._lines[-MAX_LOG_LINES:]
-        self._refresh_display()
+        line = f"  \\[{ts}] {icon} {message}"
+        try:
+            self.query_one("#log-content", RichLog).write(line)
+        except Exception:
+            pass
 
     def log_ok(self, message: str) -> None:
         """Log a success message."""
@@ -57,11 +65,3 @@ class EventLog(Widget):
     def log_start(self, message: str) -> None:
         """Log a started/in-progress message."""
         self.log(message, f"[cyan]{ICON_START}[/]")
-
-    def _refresh_display(self) -> None:
-        """Update the displayed log content."""
-        try:
-            content = self.query_one("#log-content", Static)
-            content.update("\n".join(self._lines[-8:]))  # Show last 8 lines
-        except Exception:
-            pass
