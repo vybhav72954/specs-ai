@@ -284,7 +284,16 @@ def _get_ram() -> RAMInfo:
 
         types = [int(s.SMBIOSMemoryType) for s in sticks if s.SMBIOSMemoryType]
         if types:
-            ram_type = _MEMORY_TYPE_MAP.get(types[0], "Unknown")
+            mapped = [_MEMORY_TYPE_MAP.get(t, "Unknown") for t in types]
+            distinct = {m for m in mapped if m != "Unknown"}
+            if len(distinct) == 1:
+                ram_type = distinct.pop()
+            elif len(distinct) > 1:
+                # Mixed-generation sticks (rare but possible). Surface the
+                # mismatch rather than silently picking one — the LLM should
+                # know the system is running on heterogeneous RAM.
+                ram_type = "Mixed (" + "/".join(sorted(distinct)) + ")"
+            # else: all "Unknown" → leave ram_type as "Unknown"
     except Exception:
         pass
 
@@ -408,28 +417,39 @@ def _get_motherboard() -> MotherboardInfo:
     (e.g. "FX505DT-BI7N10") that BaseBoard.Product truncates. Falls back to
     Win32_ComputerSystem.Model if ComputerSystemProduct returns nothing useful.
     All strings are filtered through _clean_board_string to discard placeholders.
+
+    Reuses a single WMI connection — each wmi.WMI() call opens a fresh COM
+    pipe, which is noticeably slow on Windows.
     """
     manufacturer: str = "Unknown"
     model: str = "Unknown"
     system_model: str = "Unknown"
 
     try:
-        board = wmi.WMI().Win32_BaseBoard()[0]
-        manufacturer = _clean_board_string(board.Manufacturer)
-        model = _clean_board_string(board.Product)
+        c = wmi.WMI()
+    except Exception:
+        return MotherboardInfo(manufacturer=manufacturer, model=model, system_model=system_model)
+
+    try:
+        boards = c.Win32_BaseBoard()
+        if boards:
+            manufacturer = _clean_board_string(boards[0].Manufacturer)
+            model = _clean_board_string(boards[0].Product)
     except Exception:
         pass
 
     try:
-        csp = wmi.WMI().Win32_ComputerSystemProduct()[0]
-        system_model = _clean_board_string(csp.Name)
+        csp = c.Win32_ComputerSystemProduct()
+        if csp:
+            system_model = _clean_board_string(csp[0].Name)
     except Exception:
         pass
 
     if system_model == "Unknown":
         try:
-            cs = wmi.WMI().Win32_ComputerSystem()[0]
-            system_model = _clean_board_string(cs.Model)
+            cs = c.Win32_ComputerSystem()
+            if cs:
+                system_model = _clean_board_string(cs[0].Model)
         except Exception:
             pass
 
@@ -581,14 +601,16 @@ def _get_power() -> PowerInfo:
 def _parse_wmi_date(wmi_date: str | None) -> str:
     """Parse a WMI DMTF datetime string (YYYYMMDDHHMMSS.mmmmmm+UUU) to YYYY-MM-DD.
 
-    Returns 'Unknown' when the input is absent or malformed.
+    Returns 'Unknown' when the input is absent, too short, or contains
+    non-digit characters in the date prefix (some buggy BIOSes return
+    placeholder text rather than a real timestamp).
     """
     if not wmi_date or len(wmi_date) < 8:
         return "Unknown"
-    try:
-        return f"{wmi_date[:4]}-{wmi_date[4:6]}-{wmi_date[6:8]}"
-    except Exception:
+    prefix = wmi_date[:8]
+    if not prefix.isdigit():
         return "Unknown"
+    return f"{prefix[:4]}-{prefix[4:6]}-{prefix[6:8]}"
 
 
 def _format_uptime(seconds: int) -> str:

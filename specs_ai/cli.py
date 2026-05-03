@@ -117,7 +117,10 @@ def main() -> None:
 
     if args.tui:
         from specs_ai.tui.app import SpecsAIApp
-        app = SpecsAIApp()
+        # Forward --model so `specs-ai --tui --model gemini-2.0-flash` is honoured
+        # (None means SpecsAIApp uses get_recommendations' default).
+        chosen = args.model if args.model != DEFAULT_MODEL else None
+        app = SpecsAIApp(model=chosen)
         app.run()
         return
 
