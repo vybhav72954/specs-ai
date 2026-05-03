@@ -9,27 +9,29 @@ class NetworkPanel(Widget):
     """Displays WiFi adapter information."""
 
     DEFAULT_CSS = """
-    NetworkPanel { height: auto; }
+    NetworkPanel {
+        height: 100%;
+        border: round #00802080;
+        background: #111111;
+        padding: 0 1;
+    }
     """
-
-    def __init__(self, wifi_data: dict | None = None, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._data = wifi_data or {}
 
     def compose(self) -> ComposeResult:
         """Build the network info display."""
-        name = self._data.get("name", "Unknown")
-
         yield Static("[b cyan]⚡ NETWORK[/]")
-        yield Static(f"  {name}")
+        yield Static("[dim]Scanning...[/]", id="net-name")
+        yield Static("", id="net-status")
 
-        # Try to show connection status
-        if name != "Unknown":
-            yield Static("  [green]● Connected[/]")
-        else:
-            yield Static("  [dim]○ No adapter[/]")
+    def update_data(self, data: dict) -> None:
+        """Populate the panel with WiFi data."""
+        name = data.get("name", "Unknown")
 
-    def update_data(self, wifi_data: dict) -> None:
-        """Refresh with new WiFi data."""
-        self._data = wifi_data
-        self.refresh(recompose=True)
+        try:
+            self.query_one("#net-name", Static).update(f"  {name}")
+            if name and name != "Unknown":
+                self.query_one("#net-status", Static).update("  [green]● Connected[/]")
+            else:
+                self.query_one("#net-status", Static).update("  [dim]○ No adapter[/]")
+        except Exception:
+            pass

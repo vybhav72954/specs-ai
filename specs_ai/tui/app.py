@@ -53,24 +53,17 @@ class SpecsAIApp(App):
             with Vertical(id="main-content"):
                 yield HeaderWidget(initial_uptime=0, id="header")
 
-                # Hardware panel grid: 3 columns x 3 rows
+                # Hardware panel grid — panels placed directly, CSS grid handles layout
                 with Vertical(id="panel-grid"):
-                    # Row 1: System | CPU | GPU
-                    with Horizontal():
-                        yield SystemPanel(classes="hw-panel", id="sys-panel")
-                        yield CPUPanel(classes="hw-panel", id="cpu-panel")
-                        yield GPUPanel(classes="hw-panel", id="gpu-panel")
-
-                    # Row 2: RAM | Storage | Network
-                    with Horizontal():
-                        yield RAMPanel(classes="hw-panel", id="ram-panel")
-                        yield StoragePanel(classes="hw-panel", id="storage-panel")
-                        yield NetworkPanel(classes="hw-panel", id="net-panel")
-
-                    # Row 3: Motherboard | Power (spans 2 cols via width)
-                    with Horizontal():
-                        yield MoboPanel(classes="hw-panel", id="mobo-panel")
-                        yield PowerPanel(classes="hw-panel", id="power-panel")
+                    yield SystemPanel(id="sys-panel")
+                    yield CPUPanel(id="cpu-panel")
+                    yield GPUPanel(id="gpu-panel")
+                    yield RAMPanel(id="ram-panel")
+                    yield StoragePanel(id="storage-panel")
+                    yield NetworkPanel(id="net-panel")
+                    yield MoboPanel(id="mobo-panel")
+                    yield PowerPanel(id="power-panel")
+                    # 9th cell is empty (only 8 panels in a 3x3 grid)
 
                 # AI Recommendations (full-width)
                 with Vertical(id="bottom-section"):
@@ -112,19 +105,26 @@ class SpecsAIApp(App):
 
     def _collect_and_display(self) -> None:
         """Background worker: collect specs and query LLM."""
+        import pythoncom
+
         from specs_ai.extractor import collect
 
         log = self.query_one("#event-log", EventLog)
         ai = self.query_one("#ai-panel", AIPanel)
 
-        # ── Phase 1: Collect hardware specs ──
+        # WMI uses COM, which must be initialized per-thread on Windows.
+        pythoncom.CoInitialize()
         try:
-            specs = collect()
-            self._specs = dataclasses.asdict(specs)
-            self.call_from_thread(log.log_ok, "Hardware specs collected")
-        except Exception as e:
-            self.call_from_thread(log.log_error, f"Extraction failed: {e}")
-            return
+            # ── Phase 1: Collect hardware specs ──
+            try:
+                specs = collect()
+                self._specs = dataclasses.asdict(specs)
+                self.call_from_thread(log.log_ok, "Hardware specs collected")
+            except Exception as e:
+                self.call_from_thread(log.log_error, f"Extraction failed: {e}")
+                return
+        finally:
+            pythoncom.CoUninitialize()
 
         # ── Phase 2: Populate panels ──
         self.call_from_thread(self._populate_panels)

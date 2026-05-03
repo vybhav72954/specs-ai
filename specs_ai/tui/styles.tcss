@@ -66,34 +66,14 @@ Screen {
 }
 
 /* ── Panel Grid ───────────────────────────────────────────── */
+/* 8 panels in a 3-column grid — panels are direct children   */
 
 #panel-grid {
     layout: grid;
     grid-size: 3 3;
-    grid-gutter: 0 1;
+    grid-gutter: 1;
     height: 1fr;
     padding: 0 1;
-}
-
-.hw-panel {
-    border: round #00802080;
-    background: #111111;
-    padding: 0 1;
-    height: 100%;
-    min-height: 5;
-}
-
-.hw-panel-title {
-    color: #00D4FF;
-    text-style: bold;
-}
-
-.hw-panel-value {
-    color: #00FF41;
-}
-
-.hw-panel-dim {
-    color: #555555;
 }
 
 /* ── Bottom panels (full-width) ───────────────────────────── */
@@ -134,22 +114,6 @@ Screen {
     background: #111111;
     color: #00D4FF;
     padding: 0 1;
-}
-
-.key-label {
-    color: #00D4FF;
-    text-style: bold;
-}
-
-.key-desc {
-    color: #555555;
-}
-
-/* ── Progress Bars ────────────────────────────────────────── */
-
-Bar {
-    color: #00FF41;
-    background: #333333;
 }
 
 /* ── Color states ─────────────────────────────────────────── */

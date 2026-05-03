@@ -4,55 +4,65 @@ from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Static
 
-from specs_ai.tui.util import fmt, usage_bar
+from specs_ai.tui.util import usage_bar
 
 
 class PowerPanel(Widget):
     """Displays battery health or desktop PSU callout."""
 
     DEFAULT_CSS = """
-    PowerPanel { height: auto; }
+    PowerPanel {
+        height: 100%;
+        border: round #00802080;
+        background: #111111;
+        padding: 0 1;
+    }
     """
-
-    def __init__(self, power_data: dict | None = None, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._data = power_data or {}
 
     def compose(self) -> ComposeResult:
         """Build the power info display."""
-        d = self._data
-        has_battery = bool(d.get("has_battery", False))
-
         yield Static("[b cyan]⏻ POWER[/]")
+        yield Static("[dim]Scanning...[/]", id="power-content")
+
+    def update_data(self, data: dict) -> None:
+        """Populate the panel with power data."""
+        has_battery = bool(data.get("has_battery", False))
 
         if not has_battery:
-            yield Static("  [dim]Desktop — no battery detected[/]")
-            yield Static("  [dim]⏚ PSU powered[/]")
+            try:
+                self.query_one("#power-content", Static).update(
+                    "  [dim]Desktop — no battery detected[/]\n"
+                    "  [dim]⏚ PSU powered[/]"
+                )
+            except Exception:
+                pass
             return
 
-        bat_name = d.get("battery_name", "Unknown")
-        health = d.get("health_pct", "Unknown")
-        design = d.get("design_capacity_mwh", "Unknown")
-        current = d.get("full_charge_capacity_mwh", "Unknown")
+        bat_name = data.get("battery_name", "Unknown")
+        health = data.get("health_pct", "Unknown")
+        design = data.get("design_capacity_mwh", "Unknown")
+        current = data.get("full_charge_capacity_mwh", "Unknown")
 
-        yield Static(f"  {bat_name}")
+        lines: list[str] = [f"  {bat_name}"]
 
-        if isinstance(health, int):
-            bar = usage_bar(health)
-            if health > 70:
-                color = "green"
-            elif health > 40:
-                color = "yellow"
+        if isinstance(health, (int, float)):
+            health_val = int(health)
+            bar = usage_bar(health_val)
+            if health_val > 70:
+                lines.append(f"  Health: [green]{bar}[/]")
+            elif health_val > 40:
+                lines.append(f"  Health: [yellow]{bar}[/]")
             else:
-                color = "red"
-            yield Static(f"  Health: [{color}]{bar}[/]")
+                lines.append(f"  Health: [red]{bar}[/]")
         else:
-            yield Static("  Health: [dim]Unknown[/]")
+            lines.append("  Health: [dim]Unknown[/]")
 
         if design != "Unknown" and current != "Unknown":
-            yield Static(f"  {fmt(design)} mWh → {fmt(current)} mWh")
+            d_fmt = int(design) if isinstance(design, float) and design == int(design) else design
+            c_fmt = int(current) if isinstance(current, float) and current == int(current) else current
+            lines.append(f"  {d_fmt} mWh → {c_fmt} mWh")
 
-    def update_data(self, power_data: dict) -> None:
-        """Refresh with new power data."""
-        self._data = power_data
-        self.refresh(recompose=True)
+        try:
+            self.query_one("#power-content", Static).update("\n".join(lines))
+        except Exception:
+            pass

@@ -4,26 +4,34 @@ from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Static
 
-from specs_ai.tui.util import fmt
-
 
 class GPUPanel(Widget):
     """Displays GPU specs with Dedicated/Integrated badge."""
 
     DEFAULT_CSS = """
-    GPUPanel { height: auto; }
+    GPUPanel {
+        height: 100%;
+        border: round #00802080;
+        background: #111111;
+        padding: 0 1;
+    }
     """
-
-    def __init__(self, gpu_data: dict | None = None, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._data = gpu_data or {}
 
     def compose(self) -> ComposeResult:
         """Build the GPU info display."""
-        d = self._data
-        name = d.get("name", "Unknown")
-        vram = fmt(d.get("vram_gb", "?"))
-        gpu_type = d.get("gpu_type", "Unknown")
+        yield Static("[b cyan]◈ GPU[/]")
+        yield Static("[dim]Scanning...[/]", id="gpu-name")
+        yield Static("", id="gpu-vram")
+
+    def update_data(self, data: dict) -> None:
+        """Populate the panel with GPU data."""
+        name = data.get("name", "Unknown")
+        vram = data.get("vram_gb", "?")
+        gpu_type = data.get("gpu_type", "Unknown")
+
+        # Format VRAM — drop .0
+        if isinstance(vram, float) and vram == int(vram):
+            vram = int(vram)
 
         if gpu_type == "Dedicated":
             badge = "[b green]⬢ Dedicated[/]"
@@ -32,11 +40,8 @@ class GPUPanel(Widget):
         else:
             badge = "[dim]Unknown[/]"
 
-        yield Static("[b cyan]◈ GPU[/]")
-        yield Static(f"  {name}")
-        yield Static(f"  {vram} GB VRAM  {badge}")
-
-    def update_data(self, gpu_data: dict) -> None:
-        """Refresh with new GPU data."""
-        self._data = gpu_data
-        self.refresh(recompose=True)
+        try:
+            self.query_one("#gpu-name", Static).update(f"  {name}")
+            self.query_one("#gpu-vram", Static).update(f"  {vram} GB VRAM  {badge}")
+        except Exception:
+            pass
