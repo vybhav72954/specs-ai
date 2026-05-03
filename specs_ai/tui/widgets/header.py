@@ -4,6 +4,7 @@ import platform
 import time
 from datetime import datetime
 
+import psutil
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.reactive import reactive
@@ -28,6 +29,15 @@ class HeaderWidget(Widget):
 
     def __init__(self, initial_uptime: int = 0, **kwargs) -> None:
         super().__init__(**kwargs)
+        # Cache the boot timestamp once so each tick reads a real wall-clock
+        # delta rather than incrementing a counter (which would drift away
+        # from psutil during long-running sessions or slow first-paint).
+        try:
+            self._boot_ts: float | None = float(psutil.boot_time())
+        except Exception:
+            self._boot_ts = None
+        # Kept for API compatibility; if psutil failed we'll fall back to
+        # the value passed in by the app once it has scanned hardware.
         self._initial_uptime = initial_uptime
 
     def compose(self) -> ComposeResult:
@@ -40,13 +50,18 @@ class HeaderWidget(Widget):
 
     def on_mount(self) -> None:
         """Start the 1-second timer for clock and uptime ticks."""
-        self.uptime_seconds = self._initial_uptime
-        self.set_interval(1.0, self._tick)
         self._tick()
+        self.set_interval(1.0, self._tick)
 
     def _tick(self) -> None:
         """Update uptime and wall clock every second."""
-        self.uptime_seconds += 1
+        if self._boot_ts is not None:
+            self.uptime_seconds = max(0, int(time.time() - self._boot_ts))
+        else:
+            # psutil unavailable — fall back to incrementing from the
+            # initial seed; less accurate but doesn't drift visibly within
+            # a single session.
+            self.uptime_seconds += 1
         self.clock_text = datetime.now().strftime("%H:%M:%S")
 
     def watch_uptime_seconds(self, value: int) -> None:
