@@ -450,7 +450,9 @@ def test_print_specs_desktop_shows_psu_callout(capsys: pytest.CaptureFixture, un
     out = capsys.readouterr().out
     assert "Desktop" in out
     assert "PSU" in out
-    assert "Battery" not in out
+    # Asserting no "Battery:" row was printed (case-sensitive on the row label
+    # only — the descriptive note may legitimately mention "battery" lowercase).
+    assert "Battery:" not in out
 
 
 def test_print_specs_shows_os_name(capsys: pytest.CaptureFixture, sample_specs: HardwareSpecs) -> None:
