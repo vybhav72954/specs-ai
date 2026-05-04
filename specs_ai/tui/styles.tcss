@@ -29,6 +29,16 @@ Screen {
     background: #0A0A0A;
 }
 
+/* ── Scroll area (everything between rain columns) ────────── */
+
+#scroll-area {
+    height: 1fr;
+    background: #0A0A0A;
+    scrollbar-color: #00802080;
+    scrollbar-color-hover: #00FF41;
+    scrollbar-color-active: #00FF41;
+}
+
 /* ── Header ───────────────────────────────────────────────── */
 
 #header {
@@ -73,7 +83,8 @@ Screen {
     layout: grid;
     grid-size: 3 3;
     grid-gutter: 1;
-    height: 1fr;
+    height: auto;
+    min-height: 24;
     padding: 0 1;
 }
 
@@ -85,7 +96,6 @@ Screen {
 
 #bottom-section {
     height: auto;
-    max-height: 16;
     padding: 0 1;
 }
 
@@ -94,8 +104,9 @@ Screen {
     background: #111111;
     padding: 0 1;
     height: auto;
-    max-height: 9;
+    max-height: 20;
     min-height: 4;
+    overflow-y: auto;
 }
 
 #ai-panel-title {
@@ -107,7 +118,7 @@ Screen {
     border: round #00802080;
     background: #111111;
     padding: 0 1;
-    height: 5;
+    height: 6;
     min-height: 4;
 }
 

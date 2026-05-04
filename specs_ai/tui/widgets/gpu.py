@@ -10,7 +10,7 @@ class GPUPanel(Widget):
 
     DEFAULT_CSS = """
     GPUPanel {
-        height: 100%;
+        height: auto;
         border: round #00802080;
         background: #111111;
         padding: 0 1;
