@@ -6,6 +6,7 @@
 Screen {
     background: #0A0A0A;
     color: #00FF41;
+    layers: default overlay;
 }
 
 /* ── Outer 3-column grid: rain | content | rain ───────────── */
@@ -147,9 +148,13 @@ Screen {
 #help-overlay {
     layer: overlay;
     dock: bottom;
+    width: 70%;
     height: auto;
-    max-height: 12;
+    max-height: 16;
     background: #111111;
     border: round #00D4FF;
     padding: 1 2;
+    margin: 0 2;
+    content-align: center middle;
+    color: #00FF41;
 }

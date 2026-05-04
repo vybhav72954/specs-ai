@@ -88,18 +88,20 @@ class SpecsAIApp(App):
                     id="footer-bar",
                 )
 
-                # Help overlay (hidden by default)
-                yield Static(
-                    "[b cyan]\u2328 KEYBINDINGS[/]\n"
-                    "  [b]Q[/] / Ctrl+C \u2014 Quit the dashboard\n"
-                    "  [b]R[/] \u2014 Re-scan hardware and re-query the LLM\n"
-                    "  [b]E[/] \u2014 Toggle compact table / detailed --explain mode\n"
-                    "  [b]S[/] \u2014 Export full specs to specs_report.json\n"
-                    "  [b]H[/] \u2014 Toggle this help overlay",
-                    id="help-overlay",
-                )
-
             yield MatrixRain(columns=2, id="rain-right")
+
+        # Help overlay — direct child of Screen so it floats above everything
+        # (rain, panels, footer) via the 'overlay' layer declared in TCSS.
+        yield Static(
+            "[b cyan]⌨ KEYBINDINGS[/]\n\n"
+            "  [b cyan]Q[/]  /  Ctrl+C   Quit the dashboard\n"
+            "  [b cyan]R[/]              Re-scan hardware and re-query the LLM\n"
+            "  [b cyan]E[/]              Toggle compact table / detailed --explain mode\n"
+            "  [b cyan]S[/]              Export full specs to specs_report.json\n"
+            "  [b cyan]H[/]              Toggle this help overlay\n\n"
+            "  [dim]Press [b]H[/b] to close[/]",
+            id="help-overlay",
+        )
 
     def on_mount(self) -> None:
         """Start the initial hardware scan."""
