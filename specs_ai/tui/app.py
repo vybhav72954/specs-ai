@@ -8,7 +8,7 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from specs_ai.tui.widgets.header import HeaderWidget
@@ -60,26 +60,25 @@ class SpecsAIApp(App):
             yield MatrixRain(columns=2, id="rain-left")
 
             with Vertical(id="main-content"):
-                with VerticalScroll(id="scroll-area"):
-                    yield HeaderWidget(initial_uptime=0, id="header")
+                yield HeaderWidget(initial_uptime=0, id="header")
 
-                    # Hardware panel grid — panels placed directly, CSS grid handles layout
-                    with Vertical(id="panel-grid"):
-                        yield SystemPanel(id="sys-panel")
-                        yield CPUPanel(id="cpu-panel")
-                        yield GPUPanel(id="gpu-panel")
-                        yield RAMPanel(id="ram-panel")
-                        yield StoragePanel(id="storage-panel")
-                        yield NetworkPanel(id="net-panel")
-                        yield MoboPanel(id="mobo-panel")
-                        yield PowerPanel(id="power-panel")
+                # Hardware panel grid — panels placed directly, CSS grid handles layout
+                with Vertical(id="panel-grid"):
+                    yield SystemPanel(id="sys-panel")
+                    yield CPUPanel(id="cpu-panel")
+                    yield GPUPanel(id="gpu-panel")
+                    yield RAMPanel(id="ram-panel")
+                    yield StoragePanel(id="storage-panel")
+                    yield NetworkPanel(id="net-panel")
+                    yield MoboPanel(id="mobo-panel")
+                    yield PowerPanel(id="power-panel")
 
-                    # AI Recommendations (full-width)
-                    with Vertical(id="bottom-section"):
-                        yield AIPanel(id="ai-panel")
-                        yield EventLog(id="event-log")
+                # AI Recommendations (full-width)
+                with Vertical(id="bottom-section"):
+                    yield AIPanel(id="ai-panel")
+                    yield EventLog(id="event-log")
 
-                # Footer keybinds (docked outside scroll area so always visible)
+                # Footer keybinds
                 yield Static(
                     " [b cyan][Q][/] (Q)uit  "
                     "[b cyan][R][/] (R)e-scan  "
@@ -91,12 +90,12 @@ class SpecsAIApp(App):
 
                 # Help overlay (hidden by default)
                 yield Static(
-                    "[b cyan]⌨ KEYBINDINGS[/]\n"
-                    "  [b]Q[/] / Ctrl+C — Quit the dashboard\n"
-                    "  [b]R[/] — Re-scan hardware and re-query the LLM\n"
-                    "  [b]E[/] — Toggle compact table / detailed --explain mode\n"
-                    "  [b]S[/] — Export full specs to specs_report.json\n"
-                    "  [b]H[/] — Toggle this help overlay",
+                    "[b cyan]\u2328 KEYBINDINGS[/]\n"
+                    "  [b]Q[/] / Ctrl+C \u2014 Quit the dashboard\n"
+                    "  [b]R[/] \u2014 Re-scan hardware and re-query the LLM\n"
+                    "  [b]E[/] \u2014 Toggle compact table / detailed --explain mode\n"
+                    "  [b]S[/] \u2014 Export full specs to specs_report.json\n"
+                    "  [b]H[/] \u2014 Toggle this help overlay",
                     id="help-overlay",
                 )
 
