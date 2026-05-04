@@ -53,13 +53,14 @@ def _format_value(value: Any, suffix: str = "") -> str:
     return f"{value}{suffix}"
 
 
-def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
+def _build_prompt(specs: dict[str, Any], verbose: bool = False, dashboard: bool = False) -> str:
     """Format a HardwareSpecs-shaped dict into an upgrade-recommendation prompt.
 
     Args:
-        specs:   Hardware specs dict (from dataclasses.asdict on HardwareSpecs).
-        verbose: True → detailed narrative with part names and impact-per-dollar.
-                 False (default) → compact markdown summary table.
+        specs:     Hardware specs dict (from dataclasses.asdict on HardwareSpecs).
+        verbose:   True → detailed narrative with part names and impact-per-dollar.
+                   False (default) → compact markdown summary table.
+        dashboard: True → callout line uses TUI keybind hint instead of CLI flag.
     """
     cpu = specs.get("cpu") or {}
     ram = specs.get("ram") or {}
@@ -208,7 +209,11 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False) -> str:
             f"{uptime_note}"
             f"{battery_note_compact}"
             "After the table, add exactly this line:\n"
-            "Run `specs-ai --explain` for detailed part recommendations and impact analysis."
+            + (
+                "Press [E] to toggle detailed explain mode."
+                if dashboard
+                else "Run `specs-ai --explain` for detailed part recommendations and impact analysis."
+            )
         )
 
     return (
@@ -236,14 +241,16 @@ def get_recommendations(
     specs: dict[str, Any],
     model: str = DEFAULT_MODEL,
     verbose: bool = False,
+    dashboard: bool = False,
 ) -> str:
     """Build a prompt from specs and return Gemini's upgrade recommendations.
 
     Args:
-        specs:   Hardware specs as a plain dict (use dataclasses.asdict on HardwareSpecs).
-        model:   Gemini model ID to use (default: gemini-2.5-flash).
-        verbose: True → detailed narrative with part names and impact-per-dollar.
-                 False (default) → compact markdown summary table.
+        specs:      Hardware specs as a plain dict (use dataclasses.asdict on HardwareSpecs).
+        model:      Gemini model ID to use (default: gemini-2.5-flash).
+        verbose:    True → detailed narrative with part names and impact-per-dollar.
+                    False (default) → compact markdown summary table.
+        dashboard:  True → callout line uses TUI keybind hint instead of CLI flag.
 
     Returns:
         Recommendation text from the model.
@@ -253,7 +260,7 @@ def get_recommendations(
         RuntimeError:     If the Gemini API call fails (network, auth, quota, etc.).
     """
     api_key = _load_api_key()
-    prompt = _build_prompt(specs, verbose=verbose)
+    prompt = _build_prompt(specs, verbose=verbose, dashboard=dashboard)
     try:
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(model=model, contents=prompt)

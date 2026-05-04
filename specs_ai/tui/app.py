@@ -200,7 +200,7 @@ class SpecsAIApp(App):
 
         try:
             from specs_ai.llm_agent import get_recommendations
-            kwargs = {"verbose": self._verbose}
+            kwargs = {"verbose": self._verbose, "dashboard": True}
             if self._model:
                 kwargs["model"] = self._model
             result = get_recommendations(self._specs, **kwargs)
@@ -275,7 +275,7 @@ class SpecsAIApp(App):
         """Background worker: re-query LLM with current specs."""
         try:
             from specs_ai.llm_agent import get_recommendations
-            kwargs = {"verbose": self._verbose}
+            kwargs = {"verbose": self._verbose, "dashboard": True}
             if self._model:
                 kwargs["model"] = self._model
             result = get_recommendations(self._specs, **kwargs)
