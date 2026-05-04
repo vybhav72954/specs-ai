@@ -208,7 +208,8 @@ def _build_prompt(specs: dict[str, Any], verbose: bool = False, dashboard: bool 
             f"{hardware_note}"
             f"{uptime_note}"
             f"{battery_note_compact}"
-            "After the table, add exactly this line:\n"
+            "After the table (outside of it, as a plain text line — NOT as a table row), "
+            "output exactly this line:\n"
             + (
                 "Press [E] to toggle detailed explain mode."
                 if dashboard
