@@ -50,7 +50,7 @@ A template is provided at `.env.example` — copy it to `.env` and fill in your 
 ## Usage
 
 ```
-specs-ai [--explain] [--specs-only] [--tui] [--model MODEL]
+specs-ai [--explain] [--specs-only] [--dashboard] [--model MODEL]
 ```
 
 | Flag | Description |
@@ -58,7 +58,7 @@ specs-ai [--explain] [--specs-only] [--tui] [--model MODEL]
 | *(none)* | Collect specs and show a compact summary table of upgrade options |
 | `--explain` | Full detailed recommendations — specific part models, impact-per-dollar |
 | `--specs-only` | Print hardware specs only; skip the LLM call entirely |
-| `--tui` | Launch the interactive hacker-esque TUI dashboard |
+| `--dashboard` | Launch the interactive hacker-esque TUI dashboard |
 | `--model MODEL` | Gemini model to use (default: `gemini-2.5-flash`) |
 
 **Quick start:**
@@ -70,7 +70,7 @@ specs-ai
 specs-ai --explain
 
 # Interactive TUI dashboard
-specs-ai --tui
+specs-ai --dashboard
 
 # Just the hardware specs, no LLM
 specs-ai --specs-only
@@ -80,14 +80,14 @@ Or equivalently via the module entry point:
 ```powershell
 python -m specs_ai
 python -m specs_ai --explain
-python -m specs_ai --tui
+python -m specs_ai --dashboard
 ```
 
 ---
 
 ## TUI Dashboard
 
-Launch with `specs-ai --tui` for a full-screen, hacker-themed hardware monitoring
+Launch with `specs-ai --dashboard` for a full-screen, hacker-themed hardware monitoring
 dashboard built with [Textual](https://textual.textualize.io/) and
 [Rich](https://rich.readthedocs.io/).
 

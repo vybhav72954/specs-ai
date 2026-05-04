@@ -104,7 +104,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Show detailed upgrade recommendations with specific part suggestions (default is a summary table).",
     )
     parser.add_argument(
-        "--tui",
+        "--dashboard",
         action="store_true",
         help="Launch the interactive hacker-esque TUI dashboard.",
     )
@@ -115,9 +115,9 @@ def main() -> None:
     """Run the specs-ai CLI: collect specs, optionally query Gemini for recommendations."""
     args = _parse_args()
 
-    if args.tui:
+    if args.dashboard:
         from specs_ai.tui.app import SpecsAIApp
-        # Forward --model so `specs-ai --tui --model gemini-2.0-flash` is honoured
+        # Forward --model so `specs-ai --dashboard --model gemini-2.0-flash` is honoured
         # (None means SpecsAIApp uses get_recommendations' default).
         chosen = args.model if args.model != DEFAULT_MODEL else None
         app = SpecsAIApp(model=chosen)

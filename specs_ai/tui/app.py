@@ -84,7 +84,7 @@ class SpecsAIApp(App):
                     " [b cyan][Q][/] (Q)uit  "
                     "[b cyan][R][/] (R)e-scan  "
                     "[b cyan][E][/] (E)xplain  "
-                    "[b cyan][S][/] (E)xport  "
+                    "[b cyan][S][/] (S)ave  "
                     "[b cyan][H][/] (H)elp",
                     id="footer-bar",
                 )
