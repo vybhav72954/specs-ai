@@ -72,7 +72,6 @@ class SpecsAIApp(App):
                     yield NetworkPanel(id="net-panel")
                     yield MoboPanel(id="mobo-panel")
                     yield PowerPanel(id="power-panel")
-                    # 9th cell is empty (only 8 panels in a 3x3 grid)
 
                 # AI Recommendations (full-width)
                 with Vertical(id="bottom-section"):
@@ -84,23 +83,25 @@ class SpecsAIApp(App):
                     " [b cyan][Q][/] (Q)uit  "
                     "[b cyan][R][/] (R)e-scan  "
                     "[b cyan][E][/] (E)xplain  "
-                    "[b cyan][S][/] (E)xport  "
+                    "[b cyan][S][/] (S)ave  "
                     "[b cyan][H][/] (H)elp",
                     id="footer-bar",
                 )
 
-                # Help overlay (hidden by default)
-                yield Static(
-                    "[b cyan]⌨ KEYBINDINGS[/]\n"
-                    "  [b]Q[/] / Ctrl+C — Quit the dashboard\n"
-                    "  [b]R[/] — Re-scan hardware and re-query the LLM\n"
-                    "  [b]E[/] — Toggle compact table / detailed --explain mode\n"
-                    "  [b]S[/] — Export full specs to specs_report.json\n"
-                    "  [b]H[/] — Toggle this help overlay",
-                    id="help-overlay",
-                )
-
             yield MatrixRain(columns=2, id="rain-right")
+
+        # Help overlay — direct child of Screen so it floats above everything
+        # (rain, panels, footer) via the 'overlay' layer declared in TCSS.
+        yield Static(
+            "[b cyan]⌨ KEYBINDINGS[/]\n\n"
+            "  [b cyan]Q[/]  /  Ctrl+C   Quit the dashboard\n"
+            "  [b cyan]R[/]              Re-scan hardware and re-query the LLM\n"
+            "  [b cyan]E[/]              Toggle compact table / detailed --explain mode\n"
+            "  [b cyan]S[/]              Export full specs to specs_report.json\n"
+            "  [b cyan]H[/]              Toggle this help overlay\n\n"
+            "  [dim]Press [b]H[/b] to close[/]",
+            id="help-overlay",
+        )
 
     def on_mount(self) -> None:
         """Start the initial hardware scan."""
@@ -199,7 +200,7 @@ class SpecsAIApp(App):
 
         try:
             from specs_ai.llm_agent import get_recommendations
-            kwargs = {"verbose": self._verbose}
+            kwargs = {"verbose": self._verbose, "dashboard": True}
             if self._model:
                 kwargs["model"] = self._model
             result = get_recommendations(self._specs, **kwargs)
@@ -274,7 +275,7 @@ class SpecsAIApp(App):
         """Background worker: re-query LLM with current specs."""
         try:
             from specs_ai.llm_agent import get_recommendations
-            kwargs = {"verbose": self._verbose}
+            kwargs = {"verbose": self._verbose, "dashboard": True}
             if self._model:
                 kwargs["model"] = self._model
             result = get_recommendations(self._specs, **kwargs)

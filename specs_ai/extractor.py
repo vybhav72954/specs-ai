@@ -1,12 +1,46 @@
 """Hardware spec extraction using WMI and psutil."""
 
 import struct
+import threading
 import time
 import winreg
 from dataclasses import dataclass
+from typing import Callable, TypeVar
 
 import psutil
+import pythoncom
 import wmi
+
+_T = TypeVar("_T")
+
+# Maximum seconds to wait for any single WMI getter before giving up.
+# WMI can hang for 30 + seconds in broken driver states; 10 s is generous
+# for a healthy system (typical response < 2 s) while avoiding the long hang.
+_WMI_TIMEOUT: float = 10.0
+
+
+def _wmi_call(fn: Callable[[], _T], fallback: _T) -> _T:
+    """Run fn() in a daemon thread with its own COM apartment.
+
+    Returns fallback if fn() does not complete within _WMI_TIMEOUT seconds or
+    raises an exception.  The abandoned thread (if any) is a daemon thread and
+    will be collected by the OS when the process exits.
+    """
+    result: list[_T] = [fallback]
+
+    def _run() -> None:
+        pythoncom.CoInitialize()
+        try:
+            result[0] = fn()
+        except Exception:
+            pass
+        finally:
+            pythoncom.CoUninitialize()
+
+    thread = threading.Thread(target=_run, daemon=True, name=f"wmi-{fn.__name__}")
+    thread.start()
+    thread.join(timeout=_WMI_TIMEOUT)
+    return result[0]
 
 
 _MEMORY_TYPE_MAP: dict[int, str] = {
@@ -680,12 +714,30 @@ def _get_system_info() -> SystemInfo:
 def collect() -> HardwareSpecs:
     """Collect all hardware specs from this machine and return a HardwareSpecs instance."""
     return HardwareSpecs(
-        cpu=_get_cpu(),
-        ram=_get_ram(),
-        gpu=_get_gpu(),
-        motherboard=_get_motherboard(),
-        drives=_get_drives(),
-        wifi=_get_wifi(),
-        power=_get_power(),
-        system=_get_system_info(),
+        cpu=_wmi_call(_get_cpu, CPUInfo(
+            name="Unknown", physical_cores="Unknown", logical_cores="Unknown",
+            max_clock_mhz="Unknown", socket="Unknown",
+        )),
+        ram=_wmi_call(_get_ram, RAMInfo(
+            total_gb="Unknown", slots_used="Unknown",
+            speed_mhz="Unknown", ram_type="Unknown",
+        )),
+        gpu=_wmi_call(_get_gpu, GPUInfo(
+            name="Unknown", vram_gb="Unknown", gpu_type="Unknown",
+        )),
+        motherboard=_wmi_call(_get_motherboard, MotherboardInfo(
+            manufacturer="Unknown", model="Unknown", system_model="Unknown",
+        )),
+        drives=_wmi_call(_get_drives, []),
+        wifi=_wmi_call(_get_wifi, WiFiInfo(name="Unknown")),
+        power=_wmi_call(_get_power, PowerInfo(
+            battery_name="Unknown", design_capacity_mwh="Unknown",
+            full_charge_capacity_mwh="Unknown", health_pct="Unknown",
+            has_battery=False,
+        )),
+        system=_wmi_call(_get_system_info, SystemInfo(
+            os_name="Unknown", os_version="Unknown", os_build="Unknown",
+            os_install_date="Unknown", system_type="Unknown",
+            boot_timestamp="Unknown", uptime_seconds="Unknown",
+        )),
     )

@@ -39,6 +39,7 @@ class NetworkPanel(Widget):
     DEFAULT_CSS = """
     NetworkPanel {
         height: 100%;
+        overflow-y: auto;
         border: round #00802080;
         background: #111111;
         padding: 0 1;

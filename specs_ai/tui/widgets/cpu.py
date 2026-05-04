@@ -33,6 +33,7 @@ class CPUPanel(Widget):
     DEFAULT_CSS = """
     CPUPanel {
         height: 100%;
+        overflow-y: auto;
         border: round #00802080;
         background: #111111;
         padding: 0 1;

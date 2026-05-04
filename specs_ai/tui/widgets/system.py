@@ -13,6 +13,7 @@ class SystemPanel(Widget):
     DEFAULT_CSS = """
     SystemPanel {
         height: 100%;
+        overflow-y: auto;
         border: round #00802080;
         background: #111111;
         padding: 0 1;
