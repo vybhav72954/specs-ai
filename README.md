@@ -1,3 +1,5 @@
+<div align="center">
+
 ```
 ███████╗██████╗ ███████╗ ██████╗███████╗       █████╗ ██╗
 ██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝      ██╔══██╗██║
@@ -7,16 +9,18 @@
 ╚══════╝╚═╝     ╚══════╝ ╚═════╝╚══════╝      ╚═╝  ╚═╝╚═╝
 ```
 
+</div>
+
 <div align="center">
 
 **AI-powered hardware upgrade assistant for Windows**
 
-[![PyPI version](https://img.shields.io/pypi/v/specs-ai?color=00FF41&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
-[![Python versions](https://img.shields.io/pypi/pyversions/specs-ai?color=00FF41&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
-[![Downloads](https://img.shields.io/pypi/dm/specs-ai?color=00FF41&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
-[![License](https://img.shields.io/pypi/l/specs-ai?color=00FF41&labelColor=0A0A0A&style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-00FF41?labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
-[![Powered by Gemini](https://img.shields.io/badge/powered%20by-Gemini-00FF41?labelColor=0A0A0A&style=flat-square)](https://aistudio.google.com/apikey)
+[![PyPI version](https://img.shields.io/pypi/v/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
+[![Python versions](https://img.shields.io/pypi/pyversions/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
+[![Downloads](https://img.shields.io/pypi/dm/specs-ai?color=F5A623&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
+[![License](https://img.shields.io/pypi/l/specs-ai?color=00C853&labelColor=0A0A0A&style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?labelColor=0A0A0A&style=flat-square&logo=windows&logoColor=white)](https://pypi.org/project/specs-ai/)
+[![Powered by Gemini](https://img.shields.io/badge/powered%20by-Gemini-8E75B2?labelColor=0A0A0A&style=flat-square&logo=googlegemini&logoColor=white)](https://aistudio.google.com/apikey)
 
 </div>
 
@@ -37,15 +41,15 @@
 
 **Dashboard** (`specs-ai --dashboard`)
 
-![Dashboard](https://raw.githubusercontent.com/vybhav72954/specs-ai/main/assets/dashboard.jpg)
+![Dashboard](https://raw.githubusercontent.com/vybhav72954/specs-ai/refs/heads/master/assets/dashboard.jpg)
 
 **CLI Summary** (`specs-ai`)
 
-![CLI Summary](https://raw.githubusercontent.com/vybhav72954/specs-ai/main/assets/summary.jpg)
+![CLI Summary](https://raw.githubusercontent.com/vybhav72954/specs-ai/refs/heads/master/assets/summary.jpg)
 
 **Detailed Recommendations** (`specs-ai --explain`)
 
-![Explain Mode](https://raw.githubusercontent.com/vybhav72954/specs-ai/main/assets/explain.jpg)
+![Explain Mode](https://raw.githubusercontent.com/vybhav72954/specs-ai/refs/heads/master/assets/explain.jpg)
 
 ---
 
