@@ -13,12 +13,15 @@
 
 **AI-powered hardware upgrade assistant for Windows**
 
-[![PyPI version](https://img.shields.io/pypi/v/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
-[![Python versions](https://img.shields.io/pypi/pyversions/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
+[![PyPI version](https://img.shields.io/pypi/v/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square&logo=pypi&logoColor=white)](https://pypi.org/project/specs-ai/)
+[![Python versions](https://img.shields.io/pypi/pyversions/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square&logo=python&logoColor=white)](https://pypi.org/project/specs-ai/)
 [![Downloads](https://img.shields.io/pypi/dm/specs-ai?color=F5A623&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
 [![License](https://img.shields.io/pypi/l/specs-ai?color=00C853&labelColor=0A0A0A&style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4?labelColor=0A0A0A&style=flat-square&logo=windows&logoColor=white)](https://pypi.org/project/specs-ai/)
 [![Powered by Gemini](https://img.shields.io/badge/powered%20by-Gemini-8E75B2?labelColor=0A0A0A&style=flat-square&logo=googlegemini&logoColor=white)](https://aistudio.google.com/apikey)
+[![Status](https://img.shields.io/pypi/status/specs-ai?color=00C853&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
+[![Wheel](https://img.shields.io/pypi/wheel/specs-ai?color=3775A9&labelColor=0A0A0A&style=flat-square)](https://pypi.org/project/specs-ai/)
+[![Code style: Ruff](https://img.shields.io/badge/code%20style-Ruff-D7FF64?labelColor=0A0A0A&style=flat-square&logo=ruff&logoColor=D7FF64)](https://docs.astral.sh/ruff/)
 
 </div>
 
